@@ -28,8 +28,8 @@ if (@ARGV<3){
 # more paths may need to be modified/added for your environment
 my $HomeDir=$ENV{HOME};
 my $EvalProg="../eval_progs/eval_mecab.py";
-my $MecabDir="/usr/local/libexec/mecab";
-$ENV{PATH} = "$MecabDir:$ENV{PATH}";
+#my $MecabDir="/usr/local/libexec/mecab";
+#$ENV{PATH} = "$MecabDir:$ENV{PATH}";
 
 my $Dir=$ARGV[0];
 my $OldVers=$ARGV[1];
@@ -43,7 +43,7 @@ my $SolutionsStd="${Dir}/solutions_standard.mecab";
 
 sub version2subdir{
     my ($Vers,$SubDir)=@_;
-    return "$Dir/$Vers/$SubDir"
+    return "$Dir/$Vers/$SubDir";
 }
 
 my $OldModelDir=version2subdir("${OldVers}","model");
