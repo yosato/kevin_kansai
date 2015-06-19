@@ -13,14 +13,23 @@
 ## finally, the test sentences and their solutions (two files) should be placed in the base dir.
 
 use strict;
-use warnings;
+#use warnings;
+
+my $Usage='mecab_process.pl [root-dir] [old-model] [new-model] <retrain-or-not (bool)>';
+
+
+# checking the args
+if (@ARGV<3){
+    print "ERROR: You need at least three arguments\n" . $Usage . "\n";
+    exit;
+}
+
 
 # more paths may need to be modified/added for your environment
 my $HomeDir=$ENV{HOME};
-my $EvalProg="$HomeDir/kevinToEdit/sync_test/eval_progs/eval_mecab.py";
+my $EvalProg="../eval_progs/eval_mecab.py";
 my $MecabDir="/usr/local/libexec/mecab";
 $ENV{PATH} = "$MecabDir:$ENV{PATH}";
-
 
 my $Dir=$ARGV[0];
 my $OldVers=$ARGV[1];
@@ -47,12 +56,14 @@ my $TrainCorpus="${NewCorpusDir}/corpus_train_${NewVers}.mecab";
 
 my $NewModelFile="${NewModelDir}/model_${NewVers}";
 
+
+
 # just for checking existence of required files and dirs
 my @PriorFiles=($OldModelFile,$NewSeedDir,$TrainCorpus,$TestSentsWest,$TestSentsStd,$SolutionsWest,$SolutionsStd);
 
 foreach my $File (@PriorFiles) {
     if (! -e $File){
-	print "$File does not exist";
+	print "$File does not exist\n";
 	exit;
     }
 }
@@ -72,9 +83,9 @@ sub run_mecab_evaluate{
     my $ModelDir=version2subdir("$ModelVers","model");
     my $CorpusDir=version2subdir("$ModelVers","corpus");
 
-    my $ResultFileStd="${CorpusDir}/results_standard.test.mecab";
-    my $ResultFileWest="${CorpusDir}/results_kansai.test.mecab";
-    my $ScoreFile="${CorpusDir}/scores.txt";
+    my $ResultFileStd="${Dir}/${ModelVers}/resultsOnStandardTest.mecab";
+    my $ResultFileWest="${Dir}/${ModelVers}/resultsOnKansaiTest.mecab";
+    my $ScoreFile="${Dir}/${ModelVers}/scores.txt";
 
     my $SysReturn=system("mecab -d $ModelDir $TestSentsWest > $ResultFileWest");
     ifnosucess_fail($SysReturn,"Kansai model mecab");
@@ -103,7 +114,7 @@ my $SysReturn=system("mecab-dict-index -d $NewSeedDir -o $NewSeedDir 1>&2");
 
 ifnosucess_fail($SysReturn,"Orig dic indexing");
 
-if ($TrainP eq "true"){
+if ($TrainP eq "true" || $TrainP eq ""){
     my $SysReturn=system("mecab-cost-train -M $OldModelFile -d $NewSeedDir $TrainCorpus $NewModelFile 1>&2");
     ifnosucess_fail($SysReturn,"Retraining ");
 }else{

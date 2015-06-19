@@ -108,6 +108,3 @@ def files_corresponding_p(FPR,FPS,Strict=True,OutputFP=None):
         
     return Bool
 
-
-Sents=extract_sentences_fromsolfile('/Users/yosato/kevinToEdit/Yo/solutions.b1new.mecab')
-open('/Users/yosato/kevinToEdit/Yo/sentences.b1.txt1','wt').write('\n'.join(Sents))

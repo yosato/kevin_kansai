@@ -1,5 +1,6 @@
 import os, sys, copy, re, imp, datetime
-import myModule,mecabtools
+import myModule
+import mecabtools
 
 imp.reload(myModule)
 imp.reload(mecabtools)
