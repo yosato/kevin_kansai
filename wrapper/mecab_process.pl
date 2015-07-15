@@ -90,11 +90,11 @@ sub run_mecab_evaluate{
     my $ResultFileWest="${Dir}/${ModelVers}/resultsOnKansaiTest.mecab";
     my $ScoreFile="${Dir}/${ModelVers}/scores.txt";
 
-    my $SysReturn=system("mecab -d $ModelDir $TestSentsWest > $ResultFileWest");
-    ifnosucess_fail($SysReturn,"Kansai model mecab");
+    my $SysReturnEval1=system("mecab -d $ModelDir $TestSentsWest > $ResultFileWest");
+    ifnosucess_fail($SysReturnEval1,"Kansai model mecab");
 
-    my $SysReturn=system("mecab -d $ModelDir $TestSentsStd > $ResultFileStd");
-    ifnosucess_fail($SysReturn,"Standard model mecab");
+    my $SysReturnEval2=system("mecab -d $ModelDir $TestSentsStd > $ResultFileStd");
+    ifnosucess_fail($SysReturnEval2,"Standard model mecab");
 
 #open(my($FSr), '>', $ScoreFile) or die "Could not open file '$ScoreFile' $!";
 
@@ -113,13 +113,14 @@ sub run_mecab_evaluate{
 
 run_mecab_evaluate($OldVers);
 
-my $SysReturn=system("mecab-dict-index -d $NewSeedDir -o $NewSeedDir 1>&2");
+my $CmdDicInd="mecab-dict-index -d $NewSeedDir -o $NewSeedDir 1>&2";
+my $SysReturnDicInd=system($CmdDicInd);
 
-ifnosucess_fail($SysReturn,"Orig dic indexing");
+ifnosucess_fail($SysReturnDicInd,"Orig dic indexing");
 
 if ($TrainP eq "true" || $TrainP eq ""){
-    my $SysReturn=system("mecab-cost-train -M $OldModelFile -d $NewSeedDir $TrainCorpus $NewModelFile 1>&2");
-    ifnosucess_fail($SysReturn,"Retraining ");
+    my $SysReturnTrain=system("mecab-cost-train -M $OldModelFile -d $NewSeedDir $TrainCorpus $NewModelFile 1>&2");
+    ifnosucess_fail($SysReturnTrain,"Retraining ");
 }else{
     print "\nThis run skips retraining (dic only)\n\n";
 }
@@ -128,13 +129,13 @@ if ($TrainP eq "false"){
     $NewModelFile=$OldModelFile;
 }
 
-my $SysReturn=system("mecab-dict-gen -m $NewModelFile -d $NewSeedDir -o $NewModelDir 1>&2");
+my $SysReturnDicGen=system("mecab-dict-gen -m $NewModelFile -d $NewSeedDir -o $NewModelDir 1>&2");
 
-ifnosucess_fail($SysReturn,"New dictionary creation");
+ifnosucess_fail($SysReturnDicGen,"New dictionary creation");
 
-my $SysReturn=system("mecab-dict-index -d $NewModelDir -o $NewModelDir 1>&2");
+my $SysReturnDicReind=system("mecab-dict-index -d $NewModelDir -o $NewModelDir 1>&2");
 
-ifnosucess_fail($SysReturn,"New dic indexing");
+ifnosucess_fail($SysReturnDicReind,"New dic indexing");
 
 run_mecab_evaluate($NewVers)
 
