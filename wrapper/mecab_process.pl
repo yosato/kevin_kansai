@@ -27,14 +27,17 @@ if (@ARGV<3){
 
 # more paths may need to be modified/added for your environment
 my $HomeDir=$ENV{HOME};
-my $EvalProg="${HomeDir}/kevin_kansai/eval_progs/eval_mecab.py";
+my $Repo="$HomeDir/kevin_kansai";
+my $EvalProg="${Repo}/eval_progs/eval_mecab.py";
 #my $MecabDir="/usr/local/libexec/mecab";
 #$ENV{PATH} = "$MecabDir:$ENV{PATH}";
 
-my $Dir=$ARGV[0];
+my $TgtDir=$ARGV[0];
 my $OldVers=$ARGV[1];
 my $NewVers=$ARGV[2];
 my $TrainP=$ARGV[3];
+
+my $Dir="$Repo/$TgtDir";
 
 my $TestSentsWest="${Dir}/test_sentences_kansai.txt";
 my $TestSentsStd="${Dir}/test_sentences_standard.txt";
