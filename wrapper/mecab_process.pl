@@ -24,14 +24,15 @@ if (@ARGV<3){
     exit;
 }
 
+my $HomeDir;
 use Config;
 
 # more paths may need to be modified/added for your environment
 # the var for home dir different between win/lin
-if ( "$Config{osname}" == 'windows') {
-    my $HomeDir="$ENV{HOMEDIR}/$ENV{HOMEPATH}";
+if ( $Config{osname} eq "windows") {
+    $HomeDir="$ENV{HOMEDIR}/$ENV{HOMEPATH}";
 } else {
-    my $HomeDir=$ENV{HOME};
+    $HomeDir=$ENV{HOME};
 }
 my $Repo="$HomeDir/kevin_kansai";
 my $EvalProg="${Repo}/eval_progs/eval_mecab.py";
@@ -107,11 +108,11 @@ sub run_mecab_evaluate{
     print "Scores for $ModelVers\n\n";
     print "On kansai data\n";
 
-    system("python3 $EvalProg $ResultFileWest $SolutionsWest | tee $ScoreFile");
+    system("python3 $EvalProg $ResultFileWest $SolutionsWest > $ScoreFile");
     
     print "\nOn standard data\n";
 
-    system("python3 $EvalProg $ResultFileStd $SolutionsStd | tee -a $ScoreFile");
+    system("python3 $EvalProg $ResultFileStd $SolutionsStd > $ScoreFile");
 
 #close $FSr;
 
