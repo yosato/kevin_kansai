@@ -83,7 +83,9 @@ foreach my $File (@PriorFiles) {
 sub ifnosucess_fail{
     my ($RetVal,$Operation)=@_;
     if ($RetVal!=0){
-	die "${Operation} failed";
+	die "${Operation} failed\n";
+    } else {
+	print "${Operation} succeeded\n";
     }
 }
 
@@ -97,54 +99,61 @@ sub run_mecab_evaluate{
     my $ResultFileWest="${Dir}/${ModelVers}/resultsOnKansaiTest.mecab";
     my $ScoreFile="${Dir}/${ModelVers}/scores.txt";
 
-    my $SysReturnEval1=system("mecab -d $ModelDir $TestSentsWest > $ResultFileWest");
-    ifnosucess_fail($SysReturnEval1,"Kansai model mecab");
+    my $MecabCmdWest="mecab -d $ModelDir $TestSentsWest > $ResultFileWest";
+    my $SysReturnMecab1=system($MecabCmdWest);
+    ifnosucess_fail($SysReturnMecab1,"Kansai model mecab");
 
-    my $SysReturnEval2=system("mecab -d $ModelDir $TestSentsStd > $ResultFileStd");
-    ifnosucess_fail($SysReturnEval2,"Standard model mecab");
+    my $MecabCmdStd="mecab -d $ModelDir $TestSentsStd > $ResultFileStd";    
+    my $SysReturnMecab2=system($MecabCmdStd);
+    ifnosucess_fail($SysReturnMecab2,"Standard model mecab");
 
-#open(my($FSr), '>', $ScoreFile) or die "Could not open file '$ScoreFile' $!";
+    my $SysReturnEval1=system("python3 $EvalProg $ResultFileWest $SolutionsWest > $ScoreFile");
+    ifnosucess_fail($SysReturnEval1,"Kansai model evaluation");
 
-    print "Scores for $ModelVers\n\n";
-    print "On kansai data\n";
+    my $SysReturnEval2=system("python3 $EvalProg $ResultFileStd $SolutionsStd >> $ScoreFile");
+    ifnosucess_fail($SysReturnEval1,"Standard model evaluation");
 
-    system("python3 $EvalProg $ResultFileWest $SolutionsWest > $ScoreFile");
+    print "Results in ${ScoreFile}, the content of which as below (Kansai and standard):\n";
     
-    print "\nOn standard data\n";
-
-    system("python3 $EvalProg $ResultFileStd $SolutionsStd > $ScoreFile");
-
-#close $FSr;
+    open(my $ScoreFSr, '<', $ScoreFile);
+    while (my $Line = <$ScoreFSr> ){
+	print $Line;
+    }
+    
 
 }
 
-run_mecab_evaluate($OldVers);
+sub main{
+    # pre-training results
+    run_mecab_evaluate($OldVers);
 
-my $CmdDicInd="mecab-dict-index -d $NewSeedDir -o $NewSeedDir 1>&2";
-my $SysReturnDicInd=system($CmdDicInd);
+    my $CmdDicInd="mecab-dict-index -d $NewSeedDir -o $NewSeedDir 1>&2";
+    my $SysReturnDicInd=system($CmdDicInd);
 
-ifnosucess_fail($SysReturnDicInd,"Orig dic indexing");
+    ifnosucess_fail($SysReturnDicInd,"Orig dic indexing");
 
-if ($TrainP eq "true" || $TrainP eq ""){
-    my $SysReturnTrain=system("mecab-cost-train -M $OldModelFile -d $NewSeedDir $TrainCorpus $NewModelFile 1>&2");
-    ifnosucess_fail($SysReturnTrain,"Retraining ");
-}else{
-    print "\nThis run skips retraining (dic only)\n\n";
+    if ($TrainP eq "true" || $TrainP eq ""){
+	my $SysReturnTrain=system("mecab-cost-train -M $OldModelFile -d $NewSeedDir $TrainCorpus $NewModelFile 1>&2");
+	ifnosucess_fail($SysReturnTrain,"Retraining ");
+    }else{
+	print "\nThis run skips retraining (dic only)\n\n";
+    }
+
+    if ($TrainP eq "false"){
+	$NewModelFile=$OldModelFile;
+    }
+
+    my $SysReturnDicGen=system("mecab-dict-gen -m $NewModelFile -d $NewSeedDir -o $NewModelDir 1>&2");
+
+    ifnosucess_fail($SysReturnDicGen,"New dictionary creation");
+
+    my $SysReturnDicReind=system("mecab-dict-index -d $NewModelDir -o $NewModelDir 1>&2");
+
+    ifnosucess_fail($SysReturnDicReind,"New dic indexing");
+
+    run_mecab_evaluate($NewVers);
+
 }
 
-if ($TrainP eq "false"){
-    $NewModelFile=$OldModelFile;
-}
-
-my $SysReturnDicGen=system("mecab-dict-gen -m $NewModelFile -d $NewSeedDir -o $NewModelDir 1>&2");
-
-ifnosucess_fail($SysReturnDicGen,"New dictionary creation");
-
-my $SysReturnDicReind=system("mecab-dict-index -d $NewModelDir -o $NewModelDir 1>&2");
-
-ifnosucess_fail($SysReturnDicReind,"New dic indexing");
-
-run_mecab_evaluate($NewVers)
-
-
+main;
 
