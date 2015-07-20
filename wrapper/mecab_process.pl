@@ -13,7 +13,9 @@
 ## finally, the test sentences and their solutions (two files) should be placed in the base dir.
 
 use strict;
-#use warnings;
+use warnings;
+
+use File::Copy;
 
 my $Usage='mecab_process.pl [root-dir] [old-model] [new-model] <retrain-or-not (bool)>';
 
@@ -22,6 +24,19 @@ my $Usage='mecab_process.pl [root-dir] [old-model] [new-model] <retrain-or-not (
 if (@ARGV<3){
     print "ERROR: You need at least three arguments\n" . $Usage . "\n";
     exit;
+}
+
+# checking the progs
+use File::Which;
+my %Paths;
+$Paths{mecab}=which('mecab');
+$Paths{mecabtools}=which('mecab-dict-index');
+$Paths{python}=which('python3');
+foreach my $Path (%Paths) {
+    if ($Path eq "") {
+	print "Program does not exist\n";
+	exit;
+    }
 }
 
 my $HomeDir;
@@ -125,15 +140,31 @@ sub run_mecab_evaluate{
 
 sub main{
     # pre-training results
+    print "'BEFORE training' test\n\n";
+
     run_mecab_evaluate($OldVers);
 
+    my @Files=("dicrc","char.def","rewrite.def","feature.def");
+
+    foreach my $File (@Files) {
+	my $OldFile="${OldModelDir}/${File}";
+	copy($OldFile,$NewSeedDir) or die("copy failed': $!");
+    }
+
+    open(my $FSrUnk, '<', "${OldModelDir}/unk.def");
+    open(my $FSwUnk, '>', "${NewSeedDir}/unk.def");
+    while ( my $Line = <$FSrUnk> ){
+	$Line=~ s/-?[0-9]+/0/g;
+	$FSwUnk->print($Line);
+    }    
     my $CmdDicInd="mecab-dict-index -d $NewSeedDir -o $NewSeedDir 1>&2";
     my $SysReturnDicInd=system($CmdDicInd);
 
     ifnosucess_fail($SysReturnDicInd,"Orig dic indexing");
 
     if ($TrainP eq "true" || $TrainP eq ""){
-	my $SysReturnTrain=system("mecab-cost-train -M $OldModelFile -d $NewSeedDir $TrainCorpus $NewModelFile 1>&2");
+	my $CmdTrain="mecab-cost-train -M $OldModelFile -d $NewSeedDir $TrainCorpus $NewModelFile";
+	my $SysReturnTrain=system($CmdTrain);
 	ifnosucess_fail($SysReturnTrain,"Retraining ");
     }else{
 	print "\nThis run skips retraining (dic only)\n\n";
