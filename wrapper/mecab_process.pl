@@ -79,7 +79,7 @@ my $NewModelDir=version2subdir("${NewVers}","model");
 my $NewCorpusDir=version2subdir("${NewVers}","corpus");
 my $TrainCorpus="${NewCorpusDir}/corpus_train_${NewVers}.mecab";
 
-my $NewModelFile="${NewModelDir}/model_${NewVers}";
+my $NewModelFile="${NewModelDir}/model_${NewVers}.mod";
 
 
 
@@ -150,13 +150,18 @@ sub main{
 	my $OldFile="${OldModelDir}/${File}";
 	copy($OldFile,$NewSeedDir) or die("copy failed': $!");
     }
+    
+    my @Files2=("unk.def","allpos.csv");
 
-    open(my $FSrUnk, '<', "${OldModelDir}/unk.def");
-    open(my $FSwUnk, '>', "${NewSeedDir}/unk.def");
-    while ( my $Line = <$FSrUnk> ){
-	$Line=~ s/-?[0-9]+/0/g;
-	$FSwUnk->print($Line);
-    }    
+    foreach my $File (@Files2){
+	open(my $FSrUnk, '<', "${OldModelDir}/$File");
+	open(my $FSwUnk, '>', "${NewSeedDir}/$File");
+	while ( my $Line = <$FSrUnk> ){
+	    $Line=~ s/-?[0-9]+/0/g;
+	    $FSwUnk->print($Line);
+	}
+    }
+	
     my $CmdDicInd="mecab-dict-index -d $NewSeedDir -o $NewSeedDir 1>&2";
     my $SysReturnDicInd=system($CmdDicInd);
 
