@@ -50,7 +50,7 @@ def files_corresponding_p(FPR,FPS,Strict=True,OutputFP=None):
         FNR=os.path.basename(FPR)
         FNS=os.path.basename(FPS)
         
-        with open(os.path.join(Dir,FNR+'.'+FNS+'.errors'),'wt') as FSwErr:
+        with open(os.path.join(Dir,FNR+'.'+FNS+'.errors'),'wt',encoding='utf-8',errors='replace') as FSwErr:
             for SentNum,SentR,SentS in Errors:
                 FSwErr.write('Sent '+str(SentNum)+': '+SentR+'\t'+SentS+'\n')
 
@@ -98,13 +98,11 @@ def files_corresponding_p(FPR,FPS,Strict=True,OutputFP=None):
                     return False
 
     if not Strict:
-        FSwR=open(FPR+'.reduced','wt')
-        FSwS=open(FPS+'.reduced','wt')
+        FSwR=open(FPR+'.reduced','wt',encoding='utf-8',errors='replace')
+        FSwS=open(FPS+'.reduced','wt',encoding='utf-8',errors='replace')
         for _,SentR,SentS in Corrects:
             FSwR.write('\n'.join(SentR)+'\nEOS\n')
             FSwS.write('\n'.join(SentS)+'\nEOS\n')
         FSwR.close();FSwS.close()
         write_errors(FPR,FPS)
-        
     return Bool
-
