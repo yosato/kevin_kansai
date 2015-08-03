@@ -14,6 +14,8 @@
 
 use strict;
 #use warnings;
+use File::copy;
+
 
 my $Usage='mecab_process.pl [root-dir] [old-model] [new-model] <retrain-or-not (bool)>';
 
@@ -35,6 +37,7 @@ if ( $Config{osname} eq "windows") {
     $HomeDir=$ENV{HOME};
 }
 my $Repo="$HomeDir/kevin_kansai";
+my $DataDir="$HomeDir/Dropbox/Mecab";
 my $EvalProg="${Repo}/eval_progs/eval_mecab.py";
 #my $MecabDir="/usr/local/libexec/mecab";
 #$ENV{PATH} = "$MecabDir:$ENV{PATH}";
@@ -44,7 +47,7 @@ my $OldVers=$ARGV[1];
 my $NewVers=$ARGV[2];
 my $TrainP=$ARGV[3];
 
-my $Dir="$Repo/$TgtDir";
+my $Dir="$DataDir/$TgtDir";
 
 my $TestSentsWest="${Dir}/test_sentences_kansai.txt";
 my $TestSentsStd="${Dir}/test_sentences_standard.txt";
@@ -132,7 +135,14 @@ sub main{
 
     ifnosucess_fail($SysReturnDicInd,"Orig dic indexing");
 
-    if ($TrainP eq "true" || $TrainP eq ""){
+#    use File::copy;
+#    my $org="${OldModelDir}/allpos.csv";
+#    my $dst="${NewSeedDir}/allpos.csv";
+#    copy($org,$dst) or die "Copy failed";
+
+
+    
+    if ($TrainP eq 'true' || $TrainP eq ""){
 	my $SysReturnTrain=system("mecab-cost-train -M $OldModelFile -d $NewSeedDir $TrainCorpus $NewModelFile 1>&2");
 	ifnosucess_fail($SysReturnTrain,"Retraining ");
     }else{
