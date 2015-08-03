@@ -7,7 +7,7 @@ def extract_sentences(FileP,LineNums='all',ReturnRaw=False,Print=False):
     def chunkprocess(Chunk,ReturnRaw):
         if not ReturnRaw:
             return Chunk.strip().split('\n')
-    FSr=open(FileP,'rt')
+    FSr=open(FileP,'rt',encoding='utf-8',errors='replace')
     extract_chunk=lambda FSr: myModule.pop_chunk_from_stream(FSr,Pattern='EOS')
     FSr,Chunk,_,NxtLine=extract_chunk(FSr)
     Sentl=False
@@ -28,7 +28,7 @@ def extract_sentences(FileP,LineNums='all',ReturnRaw=False,Print=False):
     return Sents2Ext
  
 def sentence_list(FP):
-    return re.split(r'\nEOS',open(FP,'rt').read())
+    return re.split(r'\nEOS',open(FP,'rt',encoding='utf-8',errors='replace').read())
 
 def extract_sentences_fromsolfile(SolFileP):
     Sents=extract_sentences(SolFileP)
@@ -50,7 +50,7 @@ def files_corresponding_p(FPR,FPS,Strict=True,OutputFP=None):
         FNR=os.path.basename(FPR)
         FNS=os.path.basename(FPS)
         
-        with open(os.path.join(Dir,FNR+'.'+FNS+'.errors'),'wt') as FSwErr:
+        with open(os.path.join(Dir,FNR+'.'+FNS+'.errors'),'wt',encoding='utf-8',errors='replace') as FSwErr:
             for SentNum,SentR,SentS in Errors:
                 FSwErr.write('Sent '+str(SentNum)+': '+SentR+'\t'+SentS+'\n')
 
@@ -98,13 +98,11 @@ def files_corresponding_p(FPR,FPS,Strict=True,OutputFP=None):
                     return False
 
     if not Strict:
-        FSwR=open(FPR+'.reduced','wt')
-        FSwS=open(FPS+'.reduced','wt')
+        FSwR=open(FPR+'.reduced','wt',encoding='utf-8',errors='replace')
+        FSwS=open(FPS+'.reduced','wt',encoding='utf-8',errors='replace')
         for _,SentR,SentS in Corrects:
             FSwR.write('\n'.join(SentR)+'\nEOS\n')
             FSwS.write('\n'.join(SentS)+'\nEOS\n')
         FSwR.close();FSwS.close()
         write_errors(FPR,FPS)
-        
     return Bool
-
