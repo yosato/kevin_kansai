@@ -14,11 +14,8 @@
 
 use strict;
 #use warnings;
-use File::copy;
-
 
 my $Usage='mecab_process.pl [root-dir] [old-model] [new-model] <retrain-or-not (bool)>';
-
 
 # checking the args
 if (@ARGV<3){
@@ -34,7 +31,7 @@ use Config;
 if ( $Config{osname} eq "windows") {
     $HomeDir="$ENV{HOMEDIR}/$ENV{HOMEPATH}";
 } else {
-    $HomeDir=$ENV{HOME};
+    $HomeDir='/Users/yosato';
 }
 my $Repo="$HomeDir/kevin_kansai";
 my $DataDir="$HomeDir/Dropbox/Mecab";
@@ -104,17 +101,17 @@ sub run_mecab_evaluate{
 
     my $MecabCmdWest="mecab -d $ModelDir $TestSentsWest > $ResultFileWest";
     my $SysReturnMecab1=system($MecabCmdWest);
-    ifnosucess_fail($SysReturnMecab1,"Kansai model mecab (before)");
+    ifnosucess_fail($SysReturnMecab1,"Kansai model mecab");
 
     my $MecabCmdStd="mecab -d $ModelDir $TestSentsStd > $ResultFileStd";    
     my $SysReturnMecab2=system($MecabCmdStd);
-    ifnosucess_fail($SysReturnMecab2,"Standard model mecab (before)");
+    ifnosucess_fail($SysReturnMecab2,"Standard model mecab");
 
     my $SysReturnEval1=system("python3 $EvalProg $ResultFileWest $SolutionsWest > $ScoreFile");
-    ifnosucess_fail($SysReturnEval1,"Kansai model evaluation (before)");
+    ifnosucess_fail($SysReturnEval1,"Kansai model evaluation");
 
     my $SysReturnEval2=system("python3 $EvalProg $ResultFileStd $SolutionsStd >> $ScoreFile");
-    ifnosucess_fail($SysReturnEval1,"Standard model evaluation (before)");
+    ifnosucess_fail($SysReturnEval1,"Standard model evaluation");
 
     print "Results in ${ScoreFile}, the content of which as below (Kansai and standard):\n";
     
@@ -130,18 +127,24 @@ sub main{
     # pre-training results
     run_mecab_evaluate($OldVers);
 
+    use File::Copy;
+    my @Dics=glob("${OldModelDir}/*");
+    for my $file (@Dics) {
+        copy("$file","$NewSeedDir") or die "Copy $file failed";
+    }
+
+    my @Defs=('char.def','feature.def','unk.def','rewrite.def','dicrc');
+    for my $file (@Defs) {
+        copy("${OldModelDir}/${file}","$NewSeedDir") or die "Copy $file failed";
+    }
+
     my $CmdDicInd="mecab-dict-index -d $NewSeedDir -o $NewSeedDir 1>&2";
     my $SysReturnDicInd=system($CmdDicInd);
 
-    ifnosucess_fail($SysReturnDicInd,"Orig dic indexing");
-
-#    use File::copy;
-#    my $org="${OldModelDir}/allpos.csv";
-#    my $dst="${NewSeedDir}/allpos.csv";
-#    copy($org,$dst) or die "Copy failed";
-
-
     
+    ifnosucess_fail($SysReturnDicInd,"Orig dic indexing");
+    
+
     if ($TrainP eq 'true' || $TrainP eq ""){
 	my $SysReturnTrain=system("mecab-cost-train -M $OldModelFile -d $NewSeedDir $TrainCorpus $NewModelFile 1>&2");
 	ifnosucess_fail($SysReturnTrain,"Retraining ");
