@@ -32,6 +32,7 @@ use Config;
 if ( $Config{osname} eq "windows") {
     $HomeDir="$ENV{HOMEDIR}/$ENV{HOMEPATH}";
 } else {
+    $HomeDir='/Users/yosato';
     $HomeDir=$ENV{HOME};
 }
 my $DataDir="$HomeDir/Dropbox/Mecab";
@@ -40,21 +41,21 @@ my $EvalProg="${Repo}/eval_progs/eval_mecab.py";
 #my $MecabDir="/usr/local/libexec/mecab";
 #$ENV{PATH} = "$MecabDir:$ENV{PATH}";
 
-my $TgtSubDir=$ARGV[0];
+my $TgtDir=$ARGV[0];
 my $OldVers=$ARGV[1];
 my $NewVers=$ARGV[2];
 my $TrainP=$ARGV[3];
 
-my $TgtDir="$DataDir/$TgtSubDir";
+my $Dir="$DataDir/$TgtDir";
 
-my $TestSentsWest="${TgtDir}/test_sentences_kansai.txt";
-my $TestSentsStd="${TgtDir}/test_sentences_standard.txt";
-my $SolutionsWest="${TgtDir}/solutions_kansai.mecab";
-my $SolutionsStd="${TgtDir}/solutions_standard.mecab";
+my $TestSentsWest="${Dir}/test_sentences_kansai.txt";
+my $TestSentsStd="${Dir}/test_sentences_standard.txt";
+my $SolutionsWest="${Dir}/solutions_kansai.mecab";
+my $SolutionsStd="${Dir}/solutions_standard.mecab";
 
 sub version2subdir{
     my ($Vers,$SubDir)=@_;
-    return "$TgtDir/$Vers/$SubDir";
+    return "$Dir/$Vers/$SubDir";
 }
 
 my $OldModelDir=version2subdir("${OldVers}","model");
@@ -63,13 +64,11 @@ my $OldModelFile="$OldModelDir/model_${OldVers}.mod";
 my $NewSeedDir=version2subdir("${NewVers}","seed");
 my $NewModelDir=version2subdir("${NewVers}","model");
 my $NewCorpusDir=version2subdir("${NewVers}","corpus");
-
 my $TrainCorpus="${NewCorpusDir}/corpus_train_${NewVers}.mecab";
 
 my $NewModelFile="${NewModelDir}/model_${NewVers}";
 
-my $NewCombinedVers="${OldVers}_" . $NewVers;
-my $NewCombinedDir="${TgtDir}/${NewCombinedVers}";
+
 
 # just for checking existence of required files and dirs
 my @PriorFiles=($OldModelFile,$NewSeedDir,$TrainCorpus,$TestSentsWest,$TestSentsStd,$SolutionsWest,$SolutionsStd);
@@ -98,23 +97,23 @@ sub run_mecab_evaluate{
     my $ModelDir=version2subdir("$ModelVers","model");
     my $CorpusDir=version2subdir("$ModelVers","corpus");
 
-    my $ResultFileStd="${TgtDir}/${ModelVers}/resultsOnStandardTest.mecab";
-    my $ResultFileWest="${TgtDir}/${ModelVers}/resultsOnKansaiTest.mecab";
-    my $ScoreFile="${TgtDir}/${ModelVers}/scores.txt";
+    my $ResultFileStd="${Dir}/${ModelVers}/resultsOnStandardTest.mecab";
+    my $ResultFileWest="${Dir}/${ModelVers}/resultsOnKansaiTest.mecab";
+    my $ScoreFile="${Dir}/${ModelVers}/scores.txt";
 
     my $MecabCmdWest="mecab -d $ModelDir $TestSentsWest > $ResultFileWest";
     my $SysReturnMecab1=system($MecabCmdWest);
-    ifnosucess_fail($SysReturnMecab1,"Kansai model mecab (before)");
+    ifnosucess_fail($SysReturnMecab1,"Kansai model mecab");
 
     my $MecabCmdStd="mecab -d $ModelDir $TestSentsStd > $ResultFileStd";    
     my $SysReturnMecab2=system($MecabCmdStd);
-    ifnosucess_fail($SysReturnMecab2,"Standard model mecab (before)");
+    ifnosucess_fail($SysReturnMecab2,"Standard model mecab");
 
     my $SysReturnEval1=system("python3 $EvalProg $ResultFileWest $SolutionsWest > $ScoreFile");
-    ifnosucess_fail($SysReturnEval1,"Kansai model evaluation (before)");
+    ifnosucess_fail($SysReturnEval1,"Kansai model evaluation");
 
     my $SysReturnEval2=system("python3 $EvalProg $ResultFileStd $SolutionsStd >> $ScoreFile");
-    ifnosucess_fail($SysReturnEval1,"Standard model evaluation (before)");
+    ifnosucess_fail($SysReturnEval1,"Standard model evaluation");
 
     print "Results in ${ScoreFile}, the content of which as below (Kansai and standard):\n";
     
@@ -137,12 +136,25 @@ sub main{
     # pre-training results
     run_mecab_evaluate($OldVers);
 
+    use File::Copy;
+    my @Dics=glob("${OldModelDir}/*");
+    for my $file (@Dics) {
+        copy("$file","$NewSeedDir") or die "Copy $file failed";
+    }
+
+    my @Defs=('char.def','feature.def','unk.def','rewrite.def','dicrc');
+    for my $file (@Defs) {
+        copy("${OldModelDir}/${file}","$NewSeedDir") or die "Copy $file failed";
+    }
+
     my $CmdDicInd="mecab-dict-index -d $NewSeedDir -o $NewSeedDir 1>&2";
     my $SysReturnDicInd=system($CmdDicInd);
 
+    
     ifnosucess_fail($SysReturnDicInd,"Orig dic indexing");
+    
 
-    if ($TrainP eq "true" || $TrainP eq ""){
+    if ($TrainP eq 'true' || $TrainP eq ""){
 	my $SysReturnTrain=system("mecab-cost-train -M $OldModelFile -d $NewSeedDir $TrainCorpus $NewModelFile 1>&2");
 	ifnosucess_fail($SysReturnTrain,"Retraining ");
     }else{
