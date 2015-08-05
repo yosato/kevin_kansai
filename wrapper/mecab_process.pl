@@ -31,7 +31,8 @@ use Config;
 if ( $Config{osname} eq "windows") {
     $HomeDir="$ENV{HOMEDIR}/$ENV{HOMEPATH}";
 } else {
-    $HomeDir='/Users/yosato';
+    $HomeDir='C:/Users/Kevin';
+    #$HomeDir='/Users/yosato';
 }
 my $Repo="$HomeDir/kevin_kansai";
 my $DataDir="$HomeDir/Dropbox/Mecab";
@@ -107,10 +108,10 @@ sub run_mecab_evaluate{
     my $SysReturnMecab2=system($MecabCmdStd);
     ifnosucess_fail($SysReturnMecab2,"Standard model mecab");
 
-    my $SysReturnEval1=system("python3 $EvalProg $ResultFileWest $SolutionsWest > $ScoreFile");
+    my $SysReturnEval1=system("python $EvalProg $ResultFileWest $SolutionsWest > $ScoreFile");
     ifnosucess_fail($SysReturnEval1,"Kansai model evaluation");
 
-    my $SysReturnEval2=system("python3 $EvalProg $ResultFileStd $SolutionsStd >> $ScoreFile");
+    my $SysReturnEval2=system("python $EvalProg $ResultFileStd $SolutionsStd >> $ScoreFile");
     ifnosucess_fail($SysReturnEval1,"Standard model evaluation");
 
     print "Results in ${ScoreFile}, the content of which as below (Kansai and standard):\n";
@@ -138,7 +139,7 @@ sub main{
         copy("${OldModelDir}/${file}","$NewSeedDir") or die "Copy $file failed";
     }
 
-    my $CmdDicInd="mecab-dict-index -d $NewSeedDir -o $NewSeedDir 1>&2";
+    my $CmdDicInd="mecab-dict-index -d $NewSeedDir -o $NewSeedDir -f utf-8 -t utf-8 1>&2";
     my $SysReturnDicInd=system($CmdDicInd);
 
     
@@ -160,7 +161,7 @@ sub main{
 
     ifnosucess_fail($SysReturnDicGen,"New dictionary creation");
 
-    my $SysReturnDicReind=system("mecab-dict-index -d $NewModelDir -o $NewModelDir 1>&2");
+    my $SysReturnDicReind=system("mecab-dict-index -d $NewModelDir -o $NewModelDir -f utf-8 -t utf-8 1>&2");
 
     ifnosucess_fail($SysReturnDicReind,"New dic indexing");
 
