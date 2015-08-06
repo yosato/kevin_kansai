@@ -100,6 +100,7 @@ sub ifnosucess_fail{
 }
 
 sub run_mecab_evaluate{
+    use Capture::Tiny ':all';
     my ($ModelVers)=@_;
     
     my $ModelDir=version2subdir("$ModelVers","model");
@@ -119,11 +120,14 @@ sub run_mecab_evaluate{
 
     ###! this should be changed to capture stdout. should return that stuff, rather than printing stuff. print should be relegated
 
-    my $SysReturnEval1=system("python $EvalProg $ResultFileWest $SolutionsWest >> $ScoreFile");
-    ifnosucess_fail($SysReturnEval1,"Kansai model evaluation");
+    my $WestEvalOut; my $WestEvalErr; my @WestEvalRt;
+    ($WestEvalOut,$WestEvalErr,@WestEvalRt)=capture{
+	system("python $EvalProg $ResultFileWest $SolutionsWest");
+    }
+    ifnosucess_fail($WestEvalRt,"Kansai model evaluation");
 
-    my $SysReturnEval2=system("python $EvalProg $ResultFileStd $SolutionsStd >> $ScoreFile");
-    ifnosucess_fail($SysReturnEval1,"Standard model evaluation");
+    my $SysReturnEval2=system("python $EvalProg $ResultFileStd $SolutionsStd 2>&1");
+    ifnosucess_fail($SysReturnEval2,"Standard model evaluation");
 
 #    print "Results in ${ScoreFile}, the content of which as below (Kansai and standard):\n";
     
@@ -169,7 +173,7 @@ sub prepare_newseed{
 
 sub main{
     # pre-training results
-#    run_mecab_evaluate($OldVers);
+    run_mecab_evaluate($OldVers);
 
     prepare_newseed();
 
