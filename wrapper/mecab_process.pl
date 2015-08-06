@@ -1,5 +1,11 @@
 #!/bin/perl
 
+#To dos
+# copying csv with anulling paras
+# gathering stout from python
+#
+#
+
 ##
 ## this programme assumes (for now) the following structure of dirs
 ## <model_old>/seed
@@ -28,11 +34,14 @@ use Config;
 
 # more paths may need to be modified/added for your environment
 # the var for home dir different between win/lin
-if ( $Config{osname} eq "windows") {
+my $OSName=$Config{osname};
+if ( $OSName eq "windows") {
     $HomeDir="$ENV{HOMEDIR}/$ENV{HOMEPATH}";
+} elsif ( $OSName eq 'darwin' ) {
+    $HomeDir='/Users/yosato';
 } else {
     $HomeDir='C:/Users/Kevin';
-    #$HomeDir='/Users/yosato';
+
 }
 my $Repo="$HomeDir/kevin_kansai";
 my $DataDir="$HomeDir/Dropbox/Mecab";
@@ -108,41 +117,65 @@ sub run_mecab_evaluate{
     my $SysReturnMecab2=system($MecabCmdStd);
     ifnosucess_fail($SysReturnMecab2,"Standard model mecab");
 
-    my $SysReturnEval1=system("python $EvalProg $ResultFileWest $SolutionsWest > $ScoreFile");
+    ###! this should be changed to capture stdout. should return that stuff, rather than printing stuff. print should be relegated
+
+    my $SysReturnEval1=system("python $EvalProg $ResultFileWest $SolutionsWest >> $ScoreFile");
     ifnosucess_fail($SysReturnEval1,"Kansai model evaluation");
 
     my $SysReturnEval2=system("python $EvalProg $ResultFileStd $SolutionsStd >> $ScoreFile");
     ifnosucess_fail($SysReturnEval1,"Standard model evaluation");
 
-    print "Results in ${ScoreFile}, the content of which as below (Kansai and standard):\n";
+#    print "Results in ${ScoreFile}, the content of which as below (Kansai and standard):\n";
     
-    open(my $ScoreFSr, '<', $ScoreFile);
-    while (my $Line = <$ScoreFSr> ){
-	print $Line;
+#    open(my $ScoreFSr, '<', $ScoreFile);
+    
+#    while (my $Line = <$ScoreFSr> ){
+#	print $Line;
+#    }
+#    close($ScoreFile)
+
+}
+
+sub prepare_newseed{
+    use File::Copy;
+    use File::Basename;
+    my @OldDics=glob("${OldModelDir}/*.csv");
+    for my $OldDicFP (@OldDics) {
+	copy($OldDicFP,$NewSeedDir);
+		     }
+
+    my @NewDics=(glob("${NewSeedDir}/*.csv"),${NewSeedDir}.'/unk.def');
+    for my $NewDicFP (@NewDics){
+	open(FSr,'<',$NewDicFP);
+	my $NewDicTmp=$NewDicFP.'.tmp';
+	open(SupDicFSw,'>',$NewDicTmp);
+	while (my $LiNe = <FSr> ){
+	    (my $NewLiNe=$LiNe) =~ s/,[0-9]+,[0-9]+,-?[0-9]+/,0,0,0/;
+	    print SupDicFSw $NewLiNe;
+	}
+	close(FSr);
+	close(SupDicFSw);
+	move($NewDicTmp,$NewDicFP);
     }
+
+
     
+    my @Defs=('char.def','feature.def','rewrite.def','dicrc');
+    for my $file (@Defs) {
+        copy("${OldModelDir}/${file}","$NewSeedDir") or die "Copy $file failed";
+    }
 
 }
 
 sub main{
     # pre-training results
-    run_mecab_evaluate($OldVers);
+#    run_mecab_evaluate($OldVers);
 
-    use File::Copy;
-    my @Dics=glob("${OldModelDir}/*");
-    for my $file (@Dics) {
-        copy("$file","$NewSeedDir") or die "Copy $file failed";
-    }
-
-    my @Defs=('char.def','feature.def','unk.def','rewrite.def','dicrc');
-    for my $file (@Defs) {
-        copy("${OldModelDir}/${file}","$NewSeedDir") or die "Copy $file failed";
-    }
+    prepare_newseed();
 
     my $CmdDicInd="mecab-dict-index -d $NewSeedDir -o $NewSeedDir -f utf-8 -t utf-8 1>&2";
     my $SysReturnDicInd=system($CmdDicInd);
 
-    
     ifnosucess_fail($SysReturnDicInd,"Orig dic indexing");
     
 
