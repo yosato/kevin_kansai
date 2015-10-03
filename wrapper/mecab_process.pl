@@ -64,10 +64,13 @@ my $OldModelFile="$OldModelDir/model_${OldVers}.mod";
 my $NewSeedDir=version2subdir("${NewVers}","seed");
 my $NewModelDir=version2subdir("${NewVers}","model");
 my $NewCorpusDir=version2subdir("${NewVers}","corpus");
+
 my $TrainCorpus="${NewCorpusDir}/corpus_train_${NewVers}.mecab";
 
 my $NewModelFile="${NewModelDir}/model_${NewVers}";
 
+my $CombVers=$OldVers . '_' . $NewVers;
+my $CombVersDir="${TgtDir}/${CombVers}";
 
 
 # just for checking existence of required files and dirs
@@ -126,34 +129,56 @@ sub run_mecab_evaluate{
 }
 
 sub finalclean_preparenext{
-    my ($NewCombinedDir)=@_;
-    mkdir($NewCombinedDir);
+    my (@OldDicConfFPs,$CombVersDir)=@_;
+
+    # collecting the fps copied from old dics in the seed
+    my @Files2Del;
+    foreach my $DicFP (@OldDicConfFPs){
+	my $Basename=basename($DicFP);
+	push(@Files2Del,"${NewSeedDir}/${Basename}");
+    }
+    foreach my $File (@Files2Del){
+	unlink $File;
+    }
+    mkdir($CombVersDir);
 }
 
-sub main{
-
-    finalclean_preparenext($NewCombinedDir);
-    # pre-training results
-    run_mecab_evaluate($OldVers);
-
+sub prepare_files{
+    use File::Basename;
     use File::Copy;
-    my @Dics=glob("${OldModelDir}/*");
-    for my $file (@Dics) {
+
+    my (@OldDicConfFPs)=@_;
+
+
+    for my $file (@OldDicConfFPs) {
         copy("$file","$NewSeedDir") or die "Copy $file failed";
     }
 
-    my @Defs=('char.def','feature.def','unk.def','rewrite.def','dicrc');
-    for my $file (@Defs) {
-        copy("${OldModelDir}/${file}","$NewSeedDir") or die "Copy $file failed";
-    }
+#    my @DefFNs=('char.def','feature.def','unk.def','rewrite.def','dicrc');
+#    for my $file (@DefFNs) {
+#        copy("${OldModelDir}/${file}","$NewSeedDir") or die "Copy $file failed";
+#    }
+    
+}
 
+
+sub main{
+ 
+    print 'First we evaluate the original model';
+    run_mecab_evaluate($OldVers);
+
+    my @OldDicConfFPs=glob("${OldModelDir}/*");
+    
+    print 'Copying/creating config and dic files for a new model build';
+    prepare_files(@OldDicConfFPs);
+
+    print 'Generating the dic index';
     my $CmdDicInd="mecab-dict-index -d $NewSeedDir -o $NewSeedDir 1>&2";
     my $SysReturnDicInd=system($CmdDicInd);
-
     
     ifnosucess_fail($SysReturnDicInd,"Orig dic indexing");
     
-
+    print 'Now the re-training starts...';
     if ($TrainP eq 'true' || $TrainP eq ""){
 	my $SysReturnTrain=system("mecab-cost-train -M $OldModelFile -d $NewSeedDir $TrainCorpus $NewModelFile 1>&2");
 	ifnosucess_fail($SysReturnTrain,"Retraining ");
@@ -164,7 +189,8 @@ sub main{
     if ($TrainP eq "false"){
 	$NewModelFile=$OldModelFile;
     }
-
+    
+    print 'Re-building index...';
     my $SysReturnDicGen=system("mecab-dict-gen -m $NewModelFile -d $NewSeedDir -o $NewModelDir 1>&2");
 
     ifnosucess_fail($SysReturnDicGen,"New dictionary creation");
@@ -173,7 +199,14 @@ sub main{
 
     ifnosucess_fail($SysReturnDicReind,"New dic indexing");
 
+    print 'Congrats, new combined model re-built (retraining finished)';
+    sleep(2);
+
+    print 'Now we evaluate the new model (fingers crossed)';
     run_mecab_evaluate($NewVers);
+
+    print 'Cleaning/copying files to finish up';
+    finalclean_preparenext(@OldDicConfFPs,$CombVersDir);
 
 }
 
