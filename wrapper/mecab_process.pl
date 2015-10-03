@@ -1,11 +1,5 @@
 #!/bin/perl
 
-#To dos
-# copying csv with anulling paras
-# gathering stout from python
-#
-#
-
 ##
 ## this programme assumes (for now) the following structure of dirs
 ## <model_old>/seed
@@ -23,6 +17,7 @@ use strict;
 
 my $Usage='mecab_process.pl [root-dir] [old-model] [new-model] <retrain-or-not (bool)>';
 
+
 # checking the args
 if (@ARGV<3){
     print "ERROR: You need at least three arguments\n" . $Usage . "\n";
@@ -34,17 +29,14 @@ use Config;
 
 # more paths may need to be modified/added for your environment
 # the var for home dir different between win/lin
-my $OSName=$Config{osname};
-if ( $OSName eq "windows") {
+if ( $Config{osname} eq "windows") {
     $HomeDir="$ENV{HOMEDIR}/$ENV{HOMEPATH}";
-} elsif ( $OSName eq 'darwin' ) {
-    $HomeDir='/Users/yosato';
 } else {
-    $HomeDir='C:/Users/Kevin';
-
+    $HomeDir='/Users/yosato';
+    $HomeDir=$ENV{HOME};
 }
-my $Repo="$HomeDir/kevin_kansai";
 my $DataDir="$HomeDir/Dropbox/Mecab";
+my $Repo="$HomeDir/kevin_kansai";
 my $EvalProg="${Repo}/eval_progs/eval_mecab.py";
 #my $MecabDir="/usr/local/libexec/mecab";
 #$ENV{PATH} = "$MecabDir:$ENV{PATH}";
@@ -72,10 +64,13 @@ my $OldModelFile="$OldModelDir/model_${OldVers}.mod";
 my $NewSeedDir=version2subdir("${NewVers}","seed");
 my $NewModelDir=version2subdir("${NewVers}","model");
 my $NewCorpusDir=version2subdir("${NewVers}","corpus");
+
 my $TrainCorpus="${NewCorpusDir}/corpus_train_${NewVers}.mecab";
 
 my $NewModelFile="${NewModelDir}/model_${NewVers}";
 
+my $CombVers=$OldVers . '_' . $NewVers;
+my $CombVersDir="${TgtDir}/${CombVers}";
 
 
 # just for checking existence of required files and dirs
@@ -100,7 +95,6 @@ sub ifnosucess_fail{
 }
 
 sub run_mecab_evaluate{
-    use Capture::Tiny ':all';
     my ($ModelVers)=@_;
     
     my $ModelDir=version2subdir("$ModelVers","model");
@@ -118,74 +112,73 @@ sub run_mecab_evaluate{
     my $SysReturnMecab2=system($MecabCmdStd);
     ifnosucess_fail($SysReturnMecab2,"Standard model mecab");
 
-    ###! this should be changed to capture stdout. should return that stuff, rather than printing stuff. print should be relegated
+    my $SysReturnEval1=system("python3 $EvalProg $ResultFileWest $SolutionsWest > $ScoreFile");
+    ifnosucess_fail($SysReturnEval1,"Kansai model evaluation");
 
-    my $SysReturnEval2=system("python $EvalProg $ResultFileWest $SolutionsWest 2>&1");
-    ifnosucess_fail($SysReturnEval2,"Kansai model evaluation");
+    my $SysReturnEval2=system("python3 $EvalProg $ResultFileStd $SolutionsStd >> $ScoreFile");
+    ifnosucess_fail($SysReturnEval1,"Standard model evaluation");
 
-#    my $WestEvalOut; my $WestEvalErr; my @WestEvalRt;
-#    ($WestEvalOut,$WestEvalErr,@WestEvalRt)=capture{
-#	system("python $EvalProg $ResultFileWest $SolutionsWest");
-#    }
-#    ifnosucess_fail($WestEvalRt,"Kansai model evaluation");
-
-    my $SysReturnEval2=system("python $EvalProg $ResultFileStd $SolutionsStd 2>&1");
-    ifnosucess_fail($SysReturnEval2,"Standard model evaluation");
-
-#    print "Results in ${ScoreFile}, the content of which as below (Kansai and standard):\n";
+    print "Results in ${ScoreFile}, the content of which as below (Kansai and standard):\n";
     
-#    open(my $ScoreFSr, '<', $ScoreFile);
+    open(my $ScoreFSr, '<', $ScoreFile);
+    while (my $Line = <$ScoreFSr> ){
+	print $Line;
+    }
     
-#    while (my $Line = <$ScoreFSr> ){
-#	print $Line;
-#    }
-#    close($ScoreFile)
 
 }
 
-sub prepare_newseed{
-    use File::Copy;
+sub finalclean_preparenext{
+    my (@OldDicConfFPs,$CombVersDir)=@_;
+
+    # collecting the fps copied from old dics in the seed
+    my @Files2Del;
+    foreach my $DicFP (@OldDicConfFPs){
+	my $Basename=basename($DicFP);
+	push(@Files2Del,"${NewSeedDir}/${Basename}");
+    }
+    foreach my $File (@Files2Del){
+	unlink $File;
+    }
+    mkdir($CombVersDir);
+}
+
+sub prepare_files{
     use File::Basename;
-    my @OldDics=glob("${OldModelDir}/*.csv");
-    for my $OldDicFP (@OldDics) {
-	copy($OldDicFP,$NewSeedDir);
-		     }
+    use File::Copy;
 
-    my @NewDics=(glob("${NewSeedDir}/*.csv"),${NewSeedDir}.'/unk.def');
-    for my $NewDicFP (@NewDics){
-	open(FSr,'<',$NewDicFP);
-	my $NewDicTmp=$NewDicFP.'.tmp';
-	open(SupDicFSw,'>',$NewDicTmp);
-	while (my $LiNe = <FSr> ){
-	    (my $NewLiNe=$LiNe) =~ s/,[0-9]+,[0-9]+,-?[0-9]+/,0,0,0/;
-	    print SupDicFSw $NewLiNe;
-	}
-	close(FSr);
-	close(SupDicFSw);
-	move($NewDicTmp,$NewDicFP);
+    my (@OldDicConfFPs)=@_;
+
+
+    for my $file (@OldDicConfFPs) {
+        copy("$file","$NewSeedDir") or die "Copy $file failed";
     }
 
-
+#    my @DefFNs=('char.def','feature.def','unk.def','rewrite.def','dicrc');
+#    for my $file (@DefFNs) {
+#        copy("${OldModelDir}/${file}","$NewSeedDir") or die "Copy $file failed";
+#    }
     
-    my @Defs=('char.def','feature.def','rewrite.def','dicrc');
-    for my $file (@Defs) {
-        copy("${OldModelDir}/${file}","$NewSeedDir") or die "Copy $file failed";
-    }
-
 }
+
 
 sub main{
-    # pre-training results
+ 
+    print 'First we evaluate the original model';
     run_mecab_evaluate($OldVers);
 
-    prepare_newseed();
+    my @OldDicConfFPs=glob("${OldModelDir}/*");
+    
+    print 'Copying/creating config and dic files for a new model build';
+    prepare_files(@OldDicConfFPs);
 
-    my $CmdDicInd="mecab-dict-index -d $NewSeedDir -o $NewSeedDir -f utf-8 -t utf-8 1>&2";
+    print 'Generating the dic index';
+    my $CmdDicInd="mecab-dict-index -d $NewSeedDir -o $NewSeedDir 1>&2";
     my $SysReturnDicInd=system($CmdDicInd);
-
+    
     ifnosucess_fail($SysReturnDicInd,"Orig dic indexing");
     
-
+    print 'Now the re-training starts...';
     if ($TrainP eq 'true' || $TrainP eq ""){
 	my $SysReturnTrain=system("mecab-cost-train -M $OldModelFile -d $NewSeedDir $TrainCorpus $NewModelFile 1>&2");
 	ifnosucess_fail($SysReturnTrain,"Retraining ");
@@ -196,16 +189,24 @@ sub main{
     if ($TrainP eq "false"){
 	$NewModelFile=$OldModelFile;
     }
-
+    
+    print 'Re-building index...';
     my $SysReturnDicGen=system("mecab-dict-gen -m $NewModelFile -d $NewSeedDir -o $NewModelDir 1>&2");
 
     ifnosucess_fail($SysReturnDicGen,"New dictionary creation");
 
-    my $SysReturnDicReind=system("mecab-dict-index -d $NewModelDir -o $NewModelDir -f utf-8 -t utf-8 1>&2");
+    my $SysReturnDicReind=system("mecab-dict-index -d $NewModelDir -o $NewModelDir 1>&2");
 
     ifnosucess_fail($SysReturnDicReind,"New dic indexing");
 
+    print 'Congrats, new combined model re-built (retraining finished)';
+    sleep(2);
+
+    print 'Now we evaluate the new model (fingers crossed)';
     run_mecab_evaluate($NewVers);
+
+    print 'Cleaning/copying files to finish up';
+    finalclean_preparenext(@OldDicConfFPs,$CombVersDir);
 
 }
 
