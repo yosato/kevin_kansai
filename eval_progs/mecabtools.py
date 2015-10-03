@@ -7,7 +7,7 @@ def extract_sentences(FileP,LineNums='all',ReturnRaw=False,Print=False):
     def chunkprocess(Chunk,ReturnRaw):
         if not ReturnRaw:
             return Chunk.strip().split('\n')
-    FSr=open(FileP,'rt')
+    FSr=open(FileP,'rt',encoding='utf-8',errors='replace')
     extract_chunk=lambda FSr: myModule.pop_chunk_from_stream(FSr,Pattern='EOS')
     FSr,Chunk,_,NxtLine=extract_chunk(FSr)
     Sentl=False
@@ -28,7 +28,7 @@ def extract_sentences(FileP,LineNums='all',ReturnRaw=False,Print=False):
     return Sents2Ext
  
 def sentence_list(FP):
-    return re.split(r'\nEOS',open(FP,'rt').read())
+    return re.split(r'\nEOS',open(FP,'rt',encoding='utf-8',errors='replace').read())
 
 def extract_sentences_fromsolfile(SolFileP):
     Sents=extract_sentences(SolFileP)

@@ -27,17 +27,17 @@ if (@ARGV<3){
 }
 
 # checking the progs
-use File::Which;
-my %Paths;
-$Paths{mecab}=which('mecab');
-$Paths{mecabtools}=which('mecab-dict-index');
-$Paths{python}=which('python3');
-foreach my $Path (%Paths) {
-    if ($Path eq "") {
-	print "Program does not exist\n";
-	exit;
-    }
-}
+#use File::Which;
+#my %Paths;
+#$Paths{mecab}=which('mecab');
+#$Paths{mecabtools}=which('mecab-dict-index');
+#$Paths{python}=which('python3');
+#foreach my $Path (%Paths) {
+#    if ($Path eq "") {
+#	print "Program does not exist\n";
+#	exit;
+#    }
+#}
 
 my $HomeDir;
 use Config;
@@ -49,26 +49,27 @@ if ( $Config{osname} eq "windows") {
 } else {
     $HomeDir=$ENV{HOME};
 }
+my $DataDir="$HomeDir/Dropbox/Mecab";
 my $Repo="$HomeDir/kevin_kansai";
 my $EvalProg="${Repo}/eval_progs/eval_mecab.py";
 #my $MecabDir="/usr/local/libexec/mecab";
 #$ENV{PATH} = "$MecabDir:$ENV{PATH}";
 
-my $TgtDir=$ARGV[0];
+my $TgtSubDir=$ARGV[0];
 my $OldVers=$ARGV[1];
 my $NewVers=$ARGV[2];
 my $TrainP=$ARGV[3];
 
-my $Dir="$Repo/$TgtDir";
+my $TgtDir="$DataDir/$TgtSubDir";
 
-my $TestSentsWest="${Dir}/test_sentences_kansai.txt";
-my $TestSentsStd="${Dir}/test_sentences_standard.txt";
-my $SolutionsWest="${Dir}/solutions_kansai.mecab";
-my $SolutionsStd="${Dir}/solutions_standard.mecab";
+my $TestSentsWest="${TgtDir}/test_sentences_kansai.txt";
+my $TestSentsStd="${TgtDir}/test_sentences_standard.txt";
+my $SolutionsWest="${TgtDir}/solutions_kansai.mecab";
+my $SolutionsStd="${TgtDir}/solutions_standard.mecab";
 
 sub version2subdir{
     my ($Vers,$SubDir)=@_;
-    return "$Dir/$Vers/$SubDir";
+    return "$TgtDir/$Vers/$SubDir";
 }
 
 my $OldModelDir=version2subdir("${OldVers}","model");
@@ -110,9 +111,9 @@ sub run_mecab_evaluate{
     my $ModelDir=version2subdir("$ModelVers","model");
     my $CorpusDir=version2subdir("$ModelVers","corpus");
 
-    my $ResultFileStd="${Dir}/${ModelVers}/resultsOnStandardTest.mecab";
-    my $ResultFileWest="${Dir}/${ModelVers}/resultsOnKansaiTest.mecab";
-    my $ScoreFile="${Dir}/${ModelVers}/scores.txt";
+    my $ResultFileStd="${TgtDir}/${ModelVers}/resultsOnStandardTest.mecab";
+    my $ResultFileWest="${TgtDir}/${ModelVers}/resultsOnKansaiTest.mecab";
+    my $ScoreFile="${TgtDir}/${ModelVers}/scores.txt";
 
     my $MecabCmdWest="mecab -d $ModelDir $TestSentsWest > $ResultFileWest";
     my $SysReturnMecab1=system($MecabCmdWest);
