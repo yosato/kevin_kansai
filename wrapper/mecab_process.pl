@@ -24,22 +24,6 @@ if (@ARGV<3){
     exit;
 }
 
-<<<<<<< HEAD
-# checking the progs
-#use File::Which;
-#my %Paths;
-#$Paths{mecab}=which('mecab');
-#$Paths{mecabtools}=which('mecab-dict-index');
-#$Paths{python}=which('python3');
-#foreach my $Path (%Paths) {
-#    if ($Path eq "") {
-#	print "Program does not exist\n";
-#	exit;
-#    }
-#}
-
-=======
->>>>>>> 20979b7... various changes
 my $HomeDir;
 use Config;
 
@@ -79,11 +63,13 @@ my $OldModelFile="$OldModelDir/model_${OldVers}.mod";
 my $NewSeedDir=version2subdir("${NewVers}","seed");
 my $NewModelDir=version2subdir("${NewVers}","model");
 my $NewCorpusDir=version2subdir("${NewVers}","corpus");
+
 my $TrainCorpus="${NewCorpusDir}/corpus_train_${NewVers}.mecab";
 
 my $NewModelFile="${NewModelDir}/model_${NewVers}";
 
-
+my $NewCombinedVers="${OldVers}_" . $NewVers;
+my $NewCombinedDir="${TgtDir}/${NewCombinedVers}";
 
 # just for checking existence of required files and dirs
 my @PriorFiles=($OldModelFile,$NewSeedDir,$TrainCorpus,$TestSentsWest,$TestSentsStd,$SolutionsWest,$SolutionsStd);
@@ -140,7 +126,14 @@ sub run_mecab_evaluate{
 
 }
 
+sub finalclean_preparenext{
+    my ($NewCombinedDir)=@_;
+    mkdir($NewCombinedDir);
+}
+
 sub main{
+
+    finalclean_preparenext($NewCombinedDir);
     # pre-training results
     run_mecab_evaluate($OldVers);
 
