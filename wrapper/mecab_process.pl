@@ -164,21 +164,21 @@ sub prepare_files{
 
 sub main{
  
-    print 'First we evaluate the original model';
+    print "First we evaluate the original model...\n";
     run_mecab_evaluate($OldVers);
 
     my @OldDicConfFPs=glob("${OldModelDir}/*");
     
-    print 'Copying/creating config and dic files for a new model build';
+    print "\nCopying/creating config and dic files for a new model build...\n\n";
     prepare_files(@OldDicConfFPs);
 
-    print 'Generating the dic index';
+    print "Generating the dic index\n";
     my $CmdDicInd="mecab-dict-index -d $NewSeedDir -o $NewSeedDir 1>&2";
     my $SysReturnDicInd=system($CmdDicInd);
     
     ifnosucess_fail($SysReturnDicInd,"Orig dic indexing");
     
-    print 'Now the re-training starts...';
+    print "Now the re-training starts...\n";
     if ($TrainP eq 'true' || $TrainP eq ""){
 	my $SysReturnTrain=system("mecab-cost-train -M $OldModelFile -d $NewSeedDir $TrainCorpus $NewModelFile 1>&2");
 	ifnosucess_fail($SysReturnTrain,"Retraining ");
@@ -190,7 +190,7 @@ sub main{
 	$NewModelFile=$OldModelFile;
     }
     
-    print 'Re-building index...';
+    print 'Re-building index...'."\n";
     my $SysReturnDicGen=system("mecab-dict-gen -m $NewModelFile -d $NewSeedDir -o $NewModelDir 1>&2");
 
     ifnosucess_fail($SysReturnDicGen,"New dictionary creation");
@@ -199,14 +199,16 @@ sub main{
 
     ifnosucess_fail($SysReturnDicReind,"New dic indexing");
 
-    print 'Congrats, new combined model re-built (retraining finished)';
+    print 'Congrats, new combined model re-built (retraining finished)\n\n';
     sleep(2);
 
-    print 'Now we evaluate the new model (fingers crossed)';
+    print 'Now we evaluate the new model (fingers crossed...)\n';
     run_mecab_evaluate($NewVers);
 
-    print 'Cleaning/copying files to finish up';
+    print 'Cleaning/copying files to finish up\n\n';
     finalclean_preparenext(@OldDicConfFPs,$CombVersDir);
+
+    print 'Everything done!!!\n'
 
 }
 
