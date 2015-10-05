@@ -62,15 +62,18 @@ my $OldModelDir=version2subdir("${OldVers}","model");
 my $OldModelFile="$OldModelDir/model_${OldVers}.mod";
 
 my $NewSeedDir=version2subdir("${NewVers}","seed");
-my $NewModelDir=version2subdir("${NewVers}","model");
+#my $NewModelDir=version2subdir("${NewVers}","model");
 my $NewCorpusDir=version2subdir("${NewVers}","corpus");
 
 my $TrainCorpus="${NewCorpusDir}/corpus_train_${NewVers}.mecab";
 
-my $NewModelFile="${NewModelDir}/model_${NewVers}";
-
 my $CombVers=$OldVers . '_' . $NewVers;
-my $CombVersDir="${TgtDir}/${CombVers}";
+my $CombVersDir="${Dir}/${CombVers}";
+my $CombModelDir="${CombVersDir}/model";
+
+my $NewModelDir="${CombModelDir}/model";
+my $NewModelFile="${CombModelDir}/model_${NewVers}";
+
 
 
 # just for checking existence of required files and dirs
@@ -128,7 +131,7 @@ sub run_mecab_evaluate{
 
 }
 
-sub finalclean_preparenext{
+sub final_clean{
     my (@OldDicConfFPs,$CombVersDir)=@_;
 
     # collecting the fps copied from old dics in the seed
@@ -140,7 +143,6 @@ sub finalclean_preparenext{
     foreach my $File (@Files2Del){
 	unlink $File;
     }
-    mkdir($CombVersDir);
 }
 
 sub prepare_files{
@@ -161,52 +163,72 @@ sub prepare_files{
     
 }
 
+sub mkdir_ifnotexists{
+    my ($DirN)=@_;
+    if (! -d $DirN){
+	mkdir $DirN;
+	return 1;
+    }else{
+	return 1;
+    }
+}
 
 sub main{
  
-    print 'First we evaluate the original model';
+    print "First we evaluate the original model\n\n";
     run_mecab_evaluate($OldVers);
 
     my @OldDicConfFPs=glob("${OldModelDir}/*");
     
-    print 'Copying/creating config and dic files for a new model build';
+    print "\nCopying/creating config and dic files for a new model build\n";
     prepare_files(@OldDicConfFPs);
 
-    print 'Generating the dic index';
-    my $CmdDicInd="mecab-dict-index -d $NewSeedDir -o $NewSeedDir 1>&2";
+    my $MecabLogFP="${Dir}/mecab-train-${CombVers}.log";
+
+    print "\nGenerating the original dic index\n";
+    my $CmdDicInd="mecab-dict-index -d $NewSeedDir -o $NewSeedDir > $MecabLogFP 2>&1";
     my $SysReturnDicInd=system($CmdDicInd);
     
     ifnosucess_fail($SysReturnDicInd,"Orig dic indexing");
+
     
-    print 'Now the re-training starts...';
+    print "\nNow the re-training has started (this may take time) ...\n";
+    
+    mkdir_ifnotexists($CombVersDir);
+    unless (mkdir_ifnotexists($CombModelDir)){
+	die ("mkdir failed for $CombModelDir\n");
+    }
+
     if ($TrainP eq 'true' || $TrainP eq ""){
-	my $SysReturnTrain=system("mecab-cost-train -M $OldModelFile -d $NewSeedDir $TrainCorpus $NewModelFile 1>&2");
+	my $SysReturnTrain=system("mecab-cost-train -M $OldModelFile -d $NewSeedDir $TrainCorpus $NewModelFile >> $MecabLogFP 2>&1");
 	ifnosucess_fail($SysReturnTrain,"Retraining ");
     }else{
-	print "\nThis run skips retraining (dic only)\n\n";
+	print "\nThis run skips retraining (dic only)\n";
     }
 
     if ($TrainP eq "false"){
 	$NewModelFile=$OldModelFile;
     }
     
-    print 'Re-building index...';
-    my $SysReturnDicGen=system("mecab-dict-gen -m $NewModelFile -d $NewSeedDir -o $NewModelDir 1>&2");
+    print "\nRe-building index (this may also take time) ...\n";
+    my $SysReturnDicGen=system("mecab-dict-gen -m $NewModelFile -d $NewSeedDir -o $CombModelDir >> $MecabLogFP 2>&1");
 
     ifnosucess_fail($SysReturnDicGen,"New dictionary creation");
 
-    my $SysReturnDicReind=system("mecab-dict-index -d $NewModelDir -o $NewModelDir 1>&2");
+    my $SysReturnDicReind=system("mecab-dict-index -d $NewModelDir -o $CombModelDir >> $MecabLogFP 2>&1");
 
     ifnosucess_fail($SysReturnDicReind,"New dic indexing");
 
     print 'Congrats, new combined model re-built (retraining finished)';
     sleep(2);
 
-    print 'Now we evaluate the new model (fingers crossed)';
-    run_mecab_evaluate($NewVers);
+    print "\nNow we evaluate the new model (fingers crossed)\n";
+    run_mecab_evaluate($CombVers);
 
-    print 'Cleaning/copying files to finish up';
-    finalclean_preparenext(@OldDicConfFPs,$CombVersDir);
+    print "\nCleaning files to finish up\n";
+    final_clean(@OldDicConfFPs,$CombVersDir);
+
+    print "Everything is done!!\n\n"
 
 }
 
