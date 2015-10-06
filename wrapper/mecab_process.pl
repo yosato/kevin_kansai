@@ -71,7 +71,6 @@ my $CombVers=$OldVers . '_' . $NewVers;
 my $CombVersDir="${Dir}/${CombVers}";
 my $CombModelDir="${CombVersDir}/model";
 
-my $NewModelDir="${CombModelDir}/model";
 my $NewModelFile="${CombModelDir}/model_${NewVers}";
 
 
@@ -215,7 +214,7 @@ sub main{
 
     ifnosucess_fail($SysReturnDicGen,"New dictionary creation");
 
-    my $SysReturnDicReind=system("mecab-dict-index -d $NewModelDir -o $CombModelDir >> $MecabLogFP 2>&1");
+    my $SysReturnDicReind=system("mecab-dict-index -d $CombModelDir -o $CombModelDir >> $MecabLogFP 2>&1");
 
     ifnosucess_fail($SysReturnDicReind,"New dic indexing");
 
