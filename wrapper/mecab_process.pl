@@ -139,6 +139,8 @@ sub final_clean{
 	my $Basename=basename($DicFP);
 	push(@Files2Del,"${NewSeedDir}/${Basename}");
     }
+
+    
     foreach my $File (@Files2Del){
 	unlink $File;
     }
@@ -172,6 +174,27 @@ sub mkdir_ifnotexists{
     }
 }
 
+
+sub remove_crs_files{
+    my @FPs=@_;
+    foreach my $FP (@FPs){
+	remove_crs_file($FP);
+    }
+}
+
+sub remove_crs_file{
+    my ($FP)=@_;
+    open(FH,'<',$FP);
+    my @Lines=<FH>;
+    close(FH);
+    foreach my $Line (@Lines){
+	$Line =~ s/\r//g;
+    }
+    open(FH,'>',$FP);
+    print FH @Lines;
+
+}
+
 sub main{
  
     print "First we evaluate the original model\n\n";
@@ -181,6 +204,10 @@ sub main{
     
     print "\nCopying/creating config and dic files for a new model build\n";
     prepare_files(@OldDicConfFPs);
+
+    my @CRTgts=glob("$NewSeedDir/*.csv");
+    push(@CRTgts,$TrainCorpus);
+    remove_crs_files(@CRTgts);
 
     my $MecabLogFP="${Dir}/mecab-train-${CombVers}.log";
 
