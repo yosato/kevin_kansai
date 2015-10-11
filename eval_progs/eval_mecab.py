@@ -49,8 +49,6 @@ class AmbSols:
         return Bool,PrvSeq
    
 def main0(ResFP,SolFP):
-    NoCR=open(ResFP).read().replace('\r','')
-    open(ResFP,'wt').write(NoCR)
     Strict=False
     if not mecabtools.files_corresponding_p(ResFP,SolFP,Strict=Strict):
         sys.exit('result and solutions do not seem aligned')
