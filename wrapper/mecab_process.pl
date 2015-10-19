@@ -205,9 +205,17 @@ sub main{
     print "\nCopying/creating config and dic files for a new model build\n";
     prepare_files(@OldDicConfFPs);
 
+    print 'before the cr removal from original dic (check the kansai/seed dir dic files)';
+    <STDIN>;
+
     my @CRTgts=glob("$NewSeedDir/*.csv");
     push(@CRTgts,$TrainCorpus);
+
     remove_crs_files(@CRTgts);
+
+    print 'after the cr removal from original dic (check the kansai/seed dir dic files)';
+    <STDIN>;
+    
 
     my $MecabLogFP="${Dir}/mecab-train-${CombVers}.log";
 
@@ -240,6 +248,16 @@ sub main{
     my $SysReturnDicGen=system("mecab-dict-gen -m $NewModelFile -d $NewSeedDir -o $CombModelDir >> $MecabLogFP 2>&1");
 
     ifnosucess_fail($SysReturnDicGen,"New dictionary creation");
+
+    print 'after the creation of new dics (check the kansai_standard/model dir dic files)';
+    <STDIN>;
+
+#    my @CRTgts=glob("$CombModelDir/*.csv");
+#    remove_crs_files(@CRTgts);
+
+#    print 'after the removal of CRs from new dics (check the kansai_standard/model dir dic files)';
+#    <STDIN>;
+
 
     my $SysReturnDicReind=system("mecab-dict-index -d $CombModelDir -o $CombModelDir >> $MecabLogFP 2>&1");
 
