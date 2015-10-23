@@ -114,12 +114,21 @@ sub run_mecab_evaluate{
     my $SysReturnMecab2=system($MecabCmdStd);
     ifnosucess_fail($SysReturnMecab2,"Standard model mecab");
 
+    #=== this is an ad hoc addition by ys to avoid k's prob of CRs, but we should investigate where they come from
+    my @CRTgts=glob("$Dir/$CombVers/results*.mecab");
+    remove_crs_files(@CRTgts);
+    #==================================
+    
     my $SysReturnEval1=system("python3 $EvalProg $ResultFileWest $SolutionsWest > $ScoreFile");
     ifnosucess_fail($SysReturnEval1,"Kansai model evaluation");
 
     my $SysReturnEval2=system("python3 $EvalProg $ResultFileStd $SolutionsStd >> $ScoreFile");
     ifnosucess_fail($SysReturnEval1,"Standard model evaluation");
 
+    my @CRTgts=glob("$Dir$NewVers/results*.mecab");
+    remove_crs_files(@CRTgts);
+
+    
     print "Results in ${ScoreFile}, the content of which as below (Kansai and standard):\n";
     
     open(my $ScoreFSr, '<', $ScoreFile);
@@ -205,17 +214,10 @@ sub main{
     print "\nCopying/creating config and dic files for a new model build\n";
     prepare_files(@OldDicConfFPs);
 
-    print 'before the cr removal from original dic (check the kansai/seed dir dic files)';
-    <STDIN>;
-
     my @CRTgts=glob("$NewSeedDir/*.csv");
     push(@CRTgts,$TrainCorpus);
 
     remove_crs_files(@CRTgts);
-
-    print 'after the cr removal from original dic (check the kansai/seed dir dic files)';
-    <STDIN>;
-    
 
     my $MecabLogFP="${Dir}/mecab-train-${CombVers}.log";
 
@@ -249,16 +251,8 @@ sub main{
 
     ifnosucess_fail($SysReturnDicGen,"New dictionary creation");
 
-    print 'after the creation of new dics (check the kansai_standard/model dir dic files)';
-    <STDIN>;
 
-#    my @CRTgts=glob("$CombModelDir/*.csv");
-#    remove_crs_files(@CRTgts);
-
-#    print 'after the removal of CRs from new dics (check the kansai_standard/model dir dic files)';
-#    <STDIN>;
-
-
+     
     my $SysReturnDicReind=system("mecab-dict-index -d $CombModelDir -o $CombModelDir >> $MecabLogFP 2>&1");
 
     ifnosucess_fail($SysReturnDicReind,"New dic indexing");
