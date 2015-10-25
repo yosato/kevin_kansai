@@ -183,15 +183,19 @@ sub remove_crs_files{
 }
 
 sub remove_crs_file{
+    use File::Copy;
+    
     my ($FP)=@_;
-    open(FH,'<',$FP);
-    my @Lines=<FH>;
-    close(FH);
-    foreach my $Line (@Lines){
-	$Line =~ s/\r//g;
+    open(FHr,'<',$FP);
+    my $FPTmp="${FP}.tmp";
+    open(FHw,'>',$FPTmp);
+    while (<FHr>) {
+	s/\r//g;
+	print FHw $_;
     }
-    open(FH,'>',$FP);
-    print FH @Lines;
+    close(FHr);
+    close(FHw);
+    move($FPTmp,$FP);
 
 }
 
@@ -235,12 +239,18 @@ sub main{
     if ($TrainP eq "false"){
 	$NewModelFile=$OldModelFile;
     }
+
     
     print "\nRe-building index (this may also take time) ...\n";
     my $SysReturnDicGen=system("mecab-dict-gen -m $NewModelFile -d $NewSeedDir -o $CombModelDir >> $MecabLogFP 2>&1");
 
     ifnosucess_fail($SysReturnDicGen,"New dictionary creation");
 
+
+    my @CRTgts=glob("${CombModelDir}/*.{csv,def}");
+    remove_crs_files(@CRTgts);
+
+    
     my $SysReturnDicReind=system("mecab-dict-index -d $CombModelDir -o $CombModelDir >> $MecabLogFP 2>&1");
 
     ifnosucess_fail($SysReturnDicReind,"New dic indexing");
