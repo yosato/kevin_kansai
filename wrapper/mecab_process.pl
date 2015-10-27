@@ -19,13 +19,15 @@ my $Usage='mecab_process.pl [root-dir] [old-model] [new-model] <retrain-or-not (
 
 
 # checking the args
-if (@ARGV<3){
-    print "ERROR: You need at least three arguments\n" . $Usage . "\n";
+if (@ARGV<2){
+    print "ERROR: You need at least two arguments\n" . $Usage . "\n";
     exit;
 }
 
 my $HomeDir;
 use Config;
+use File::Spec;
+
 
 # more paths may need to be modified/added for your environment
 # the var for home dir different between win/lin
@@ -35,48 +37,48 @@ if ( $Config{osname} eq "windows") {
     $HomeDir='/Users/yosato';
     $HomeDir=$ENV{HOME};
 }
+
 my $DataDir="$HomeDir/Dropbox/Mecab";
 my $Repo="$HomeDir/kevin_kansai";
 my $EvalProg="${Repo}/eval_progs/eval_mecab.py";
 #my $MecabDir="/usr/local/libexec/mecab";
 #$ENV{PATH} = "$MecabDir:$ENV{PATH}";
 
-my $TgtDir=$ARGV[0];
-my $OldVers=$ARGV[1];
-my $NewVers=$ARGV[2];
+#my $path = 'D:\Folder\AnotherFolder\file.txt';  # note the single quotes
+#my @elements = File::Spec->splitdir($path);
+#my $TgtDir=$ARGV[0];
+my ($OldRtDirN,$OldVers)=split('/',$ARGV[0]);
+my ($AddRtDirN,$AddVers)=split('/',$ARGV[1]);
+my ($CombRtDirN,$CombVers)=split('/',$ARGV[2]);
 my $TrainP=$ARGV[3];
 
-my $Dir="$DataDir/$TgtDir";
+my $OldRtDir="${DataDir}/${OldRtDirN}";
+my $AddRtDir="${DataDir}/${AddRtDirN}";
+my $CombRtDir="${DataDir}/${CombRtDirN}";
 
-my $TestSentsWest="${Dir}/test_sentences_kansai.txt";
-my $TestSentsStd="${Dir}/test_sentences_standard.txt";
-my $SolutionsWest="${Dir}/solutions_kansai.mecab";
-my $SolutionsStd="${Dir}/solutions_standard.mecab";
+my $TestSentsWest="${AddRtDir}/test_sentences_kansai.txt";
+my $TestSentsStd="${OldRtDir}/test_sentences_standard.txt";
+my $SolutionsWest="${AddRtDir}/solutions_kansai.mecab";
+my $SolutionsStd="${OldRtDir}/solutions_standard.mecab";
 
-sub version2subdir{
-    my ($Vers,$SubDir)=@_;
-    return "$Dir/$Vers/$SubDir";
-}
+my $OldModelDir="${OldRtDir}/${OldVers}/model";
+my $OldModelFile="${OldModelDir}/model_${OldVers}.mod";
 
-my $OldModelDir=version2subdir("${OldVers}","model");
-my $OldModelFile="$OldModelDir/model_${OldVers}.mod";
+my $AddSeedDir="${AddRtDir}/${AddVers}/seed";
+my $AddCorpusDir="${AddRtDir}/${AddVers}/corpus";
 
-my $NewSeedDir=version2subdir("${NewVers}","seed");
-#my $NewModelDir=version2subdir("${NewVers}","model");
-my $NewCorpusDir=version2subdir("${NewVers}","corpus");
+my $TrainCorpus="${AddCorpusDir}/corpus_train_${AddVers}.mecab";
 
-my $TrainCorpus="${NewCorpusDir}/corpus_train_${NewVers}.mecab";
-
-my $CombVers=$OldVers . '_' . $NewVers;
-my $CombVersDir="${Dir}/${CombVers}";
+my $CombVers=$OldVers . '_' . $AddVers;
+my $CombVersDir="${AddRtDir}/${CombVers}";
 my $CombModelDir="${CombVersDir}/model";
 
-my $NewModelFile="${CombModelDir}/model_${NewVers}";
+my $NewModelFile="${CombModelDir}/model_${AddVers}";
 
 
 
 # just for checking existence of required files and dirs
-my @PriorFiles=($OldModelFile,$NewSeedDir,$TrainCorpus,$TestSentsWest,$TestSentsStd,$SolutionsWest,$SolutionsStd);
+my @PriorFiles=($OldModelFile,$AddSeedDir,$TrainCorpus,$TestSentsWest,$TestSentsStd,$SolutionsWest,$SolutionsStd);
 
 foreach my $File (@PriorFiles) {
     if (! -e $File){
@@ -97,14 +99,15 @@ sub ifnosucess_fail{
 }
 
 sub run_mecab_evaluate{
-    my ($ModelVers)=@_;
+    my ($ModelDir)=@_;
+    my ($ModelRtDir,$ModelVers)=split('/',$ModelDir);
     
-    my $ModelDir=version2subdir("$ModelVers","model");
-    my $CorpusDir=version2subdir("$ModelVers","corpus");
+    my $ModelDir="${DataDir}/${ModelDir}/model";
+    my $CorpusDir="${DataDir}/${ModelDir}/corpus";
 
-    my $ResultFileStd="${Dir}/${ModelVers}/resultsOnStandardTest.mecab";
-    my $ResultFileWest="${Dir}/${ModelVers}/resultsOnKansaiTest.mecab";
-    my $ScoreFile="${Dir}/${ModelVers}/scores.txt";
+    my $ResultFileStd="${DataDir}/${ModelRtDir}/resultsOnStandardTest.mecab";
+    my $ResultFileWest="${DataDir}/${ModelRtDir}/resultsOnKansaiTest.mecab";
+    my $ScoreFile="${DataDir}/${ModelRtDir}/scores.txt";
 
     my $MecabCmdWest="mecab -d $ModelDir $TestSentsWest > $ResultFileWest";
     my $SysReturnMecab1=system($MecabCmdWest);
@@ -137,7 +140,7 @@ sub final_clean{
     my @Files2Del;
     foreach my $DicFP (@OldDicConfFPs){
 	my $Basename=basename($DicFP);
-	push(@Files2Del,"${NewSeedDir}/${Basename}");
+	push(@Files2Del,"${AddSeedDir}/${Basename}");
     }
 
     
@@ -150,17 +153,16 @@ sub prepare_files{
     use File::Basename;
     use File::Copy;
 
-    my (@OldDicConfFPs)=@_;
+    my ($AddSeedDir,$OldDicConfFPs)=@_;
 
-
-    for my $file (@OldDicConfFPs) {
-        copy("$file","$NewSeedDir") or die "Copy $file failed";
+    
+    for my $file (@{$OldDicConfFPs}) {
+        copy("$file","$AddSeedDir") or die "Copy $file failed";
     }
 
-#    my @DefFNs=('char.def','feature.def','unk.def','rewrite.def','dicrc');
-#    for my $file (@DefFNs) {
-#        copy("${OldModelDir}/${file}","$NewSeedDir") or die "Copy $file failed";
-#    }
+#    my @CRTgts=glob("$AddSeedDir/*.csv");
+    push(@{$OldDicConfFPs},$TrainCorpus);
+    remove_crs_files(@{$OldDicConfFPs});
     
 }
 
@@ -202,21 +204,17 @@ sub remove_crs_file{
 sub main{
  
     print "First we evaluate the original model\n\n";
-    run_mecab_evaluate($OldVers);
+    run_mecab_evaluate("${OldRtDirN}/${OldVers}");
 
     my @OldDicConfFPs=glob("${OldModelDir}/*");
     
     print "\nCopying/creating config and dic files for a new model build\n";
-    prepare_files(@OldDicConfFPs);
+    prepare_files($AddSeedDir,\@OldDicConfFPs);
 
-    my @CRTgts=glob("$NewSeedDir/*.csv");
-    push(@CRTgts,$TrainCorpus);
-    remove_crs_files(@CRTgts);
-
-    my $MecabLogFP="${Dir}/mecab-train-${CombVers}.log";
+    my $MecabLogFP="${AddRtDir}/mecab-train-${CombVers}.log";
 
     print "\nGenerating the original dic index\n";
-    my $CmdDicInd="mecab-dict-index -d $NewSeedDir -o $NewSeedDir > $MecabLogFP 2>&1";
+    my $CmdDicInd="mecab-dict-index -d $AddSeedDir -o $AddSeedDir > $MecabLogFP 2>&1";
     my $SysReturnDicInd=system($CmdDicInd);
     
     ifnosucess_fail($SysReturnDicInd,"Orig dic indexing");
@@ -230,7 +228,7 @@ sub main{
     }
 
     if ($TrainP eq 'true' || $TrainP eq ""){
-	my $SysReturnTrain=system("mecab-cost-train -M $OldModelFile -d $NewSeedDir $TrainCorpus $NewModelFile >> $MecabLogFP 2>&1");
+	my $SysReturnTrain=system("mecab-cost-train -M $OldModelFile -d $AddSeedDir $TrainCorpus $NewModelFile >> $MecabLogFP 2>&1");
 	ifnosucess_fail($SysReturnTrain,"Retraining ");
     }else{
 	print "\nThis run skips retraining (dic only)\n";
@@ -242,7 +240,7 @@ sub main{
 
     
     print "\nRe-building index (this may also take time) ...\n";
-    my $SysReturnDicGen=system("mecab-dict-gen -m $NewModelFile -d $NewSeedDir -o $CombModelDir >> $MecabLogFP 2>&1");
+    my $SysReturnDicGen=system("mecab-dict-gen -m $NewModelFile -d $AddSeedDir -o $CombModelDir >> $MecabLogFP 2>&1");
 
     ifnosucess_fail($SysReturnDicGen,"New dictionary creation");
 
@@ -259,7 +257,7 @@ sub main{
     sleep(2);
 
     print "\nNow we evaluate the new model (fingers crossed)\n";
-    run_mecab_evaluate($CombVers);
+    run_mecab_evaluate("$AddRtDirN/$CombVers");
 
     print "\nCleaning files to finish up\n";
     final_clean(@OldDicConfFPs,$CombVersDir);
