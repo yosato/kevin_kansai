@@ -49,8 +49,11 @@ my $EvalProg="${Repo}/eval_progs/eval_mecab.py";
 #my $TgtDir=$ARGV[0];
 my ($OldRtDirN,$OldVers)=split('/',$ARGV[0]);
 my ($AddRtDirN,$AddVers)=split('/',$ARGV[1]);
-my ($CombRtDirN,$CombVers)=split('/',$ARGV[2]);
-my $TrainP=$ARGV[3];
+my $CombRtDirN=$ARGV[2];
+my $EvalOnlyP=$ARGV[3];
+my $TestFileDir=$ARGV[4];
+my $TrainP=$ARGV[5];
+
 
 my $OldRtDir="${DataDir}/${OldRtDirN}";
 my $AddRtDir="${DataDir}/${AddRtDirN}";
@@ -109,7 +112,8 @@ sub run_mecab_evaluate{
     my $ResultFileWest="${DataDir}/${ModelRtDir}/resultsOnKansaiTest.mecab";
     my $ScoreFile="${DataDir}/${ModelRtDir}/scores.txt";
 
-    my $MecabCmdWest="mecab -d $ModelDir $TestSentsWest > $ResultFileWest";
+    my $MecabCmdWest="mecab -d $ModelDir $TestSentsWest;
+# > $ResultFileWest";
     my $SysReturnMecab1=system($MecabCmdWest);
     ifnosucess_fail($SysReturnMecab1,"Kansai model mecab");
 
@@ -201,16 +205,7 @@ sub remove_crs_file{
 
 }
 
-sub main{
- 
-    print "First we evaluate the original model\n\n";
-    run_mecab_evaluate("${OldRtDirN}/${OldVers}");
-
-    my @OldDicConfFPs=glob("${OldModelDir}/*");
-    
-    print "\nCopying/creating config and dic files for a new model build\n";
-    prepare_files($AddSeedDir,\@OldDicConfFPs);
-
+sub retrain_model{
     my $MecabLogFP="${AddRtDir}/mecab-train-${CombVers}.log";
 
     print "\nGenerating the original dic index\n";
@@ -219,7 +214,6 @@ sub main{
     
     ifnosucess_fail($SysReturnDicInd,"Orig dic indexing");
 
-    
     print "\nNow the re-training has started (this may take time) ...\n";
     
     mkdir_ifnotexists($CombVersDir);
@@ -256,6 +250,22 @@ sub main{
     print 'Congrats, new combined model re-built (retraining finished)';
     sleep(2);
 
+}
+
+sub main{
+ 
+    print "First we evaluate the original model\n\n";
+    run_mecab_evaluate("${OldRtDirN}/${OldVers}");
+
+    my @OldDicConfFPs=glob("${OldModelDir}/*");
+    
+    print "\nCopying/creating config and dic files for a new model build\n";
+    prepare_files($AddSeedDir,\@OldDicConfFPs);
+
+    if (not $EvalOnlyP){
+	retrain_model;
+    }
+    
     print "\nNow we evaluate the new model (fingers crossed)\n";
     run_mecab_evaluate("$AddRtDirN/$CombVers");
 
