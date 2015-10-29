@@ -50,16 +50,18 @@ my $EvalProg="${Repo}/eval_progs/eval_mecab.py";
 my ($OldRtDirN,$OldVers)=split('/',$ARGV[0]);
 my ($AddRtDirN,$AddVers)=split('/',$ARGV[1]);
 my ($CombRtDirN,$CombVers)=split('/',$ARGV[2]);
-my $TrainP=$ARGV[3];
+my $TestFileDirN=$ARGV[3];
+my $TrainP=$ARGV[4];
 
 my $OldRtDir="${DataDir}/${OldRtDirN}";
 my $AddRtDir="${DataDir}/${AddRtDirN}";
 my $CombRtDir="${DataDir}/${CombRtDirN}";
+my $TestFileRtDir="${DataDir}/${TestFileDirN}";
 
-my $TestSentsWest="${AddRtDir}/test_sentences_kansai.txt";
-my $TestSentsStd="${OldRtDir}/test_sentences_standard.txt";
-my $SolutionsWest="${AddRtDir}/solutions_kansai.mecab";
-my $SolutionsStd="${OldRtDir}/solutions_standard.mecab";
+my $TestSentsWest="${TestFileRtDir}/test_sentences_kansai.txt";
+my $TestSentsStd="${TestFileRtDir}/test_sentences_standard.txt";
+my $SolutionsWest="${TestFileRtDir}/solutions_kansai.mecab";
+my $SolutionsStd="${TestFileRtDir}/solutions_standard.mecab";
 
 my $OldModelDir="${OldRtDir}/${OldVers}/model";
 my $OldModelFile="${OldModelDir}/model_${OldVers}.mod";
