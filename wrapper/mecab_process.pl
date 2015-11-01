@@ -41,42 +41,39 @@ my $EvalProg="${Repo}/eval_progs/eval_mecab.py";
 #my $MecabDir="/usr/local/libexec/mecab";
 #$ENV{PATH} = "$MecabDir:$ENV{PATH}";
 
-my $TgtDir=$ARGV[0];
+my $OldSubDir=$ARGV[0];
+my $OldDir="$DataDir/$OldSubDir";
 my $OldVers=$ARGV[1];
-my $AddVers=$ARGV[2];
-my $TrainP=$ARGV[3];
+my $AddSubDir=$ARGV[2];
+my $AddDir="$DataDir/$AddSubDir";
+my $AddVers=$ARGV[3];
+my $TestFileSubDir=$ARGV[4];
+my $TestFileDir="$DataDir/$TestFileSubDir";
+my $TrainP=$ARGV[5];
 
-my $Dir="$DataDir/$TgtDir";
+my $TestSentsWest="${TestFileDir}/test_sentences_kansai.txt";
+my $TestSentsStd="${TestFileDir}/test_sentences_standard.txt";
+my $SolutionsWest="${TestFileDir}/solutions_kansai.mecab";
+my $SolutionsStd="${TestFileDir}/solutions_standard.mecab";
 
-my $TestSentsWest="${Dir}/test_sentences_kansai.txt";
-my $TestSentsStd="${Dir}/test_sentences_standard.txt";
-my $SolutionsWest="${Dir}/solutions_kansai.mecab";
-my $SolutionsStd="${Dir}/solutions_standard.mecab";
+my $OldModelDir="${OldDir}/${OldVers}/model";
+my $OldModelFile="${OldModelDir}/model_${OldVers}.mod";
 
-sub version2subdir{
-    my ($Vers,$SubDir)=@_;
-    return "$Dir/$Vers/$SubDir";
-}
-
-my $OldModelDir=version2subdir("${OldVers}","model");
-my $OldModelFile="$OldModelDir/model_${OldVers}.mod";
-
-my $AddSeedDir=version2subdir("${AddVers}","seed");
-#my $AddModelDir=version2subdir("${AddVers}","model");
-my $AddCorpusDir=version2subdir("${AddVers}","corpus");
+my $AddSeedDir="${AddDir}/${AddVers}/seed";
+my $AddCorpusDir="${AddDir}/${AddVers}/corpus";
 
 my $TrainCorpus="${AddCorpusDir}/corpus_train_${AddVers}.mecab";
 
 my $CombVers=$OldVers . '_' . $AddVers;
-my $CombVersDir="${Dir}/${CombVers}";
+my $CombVersDir="${AddDir}/${CombVers}";
 my $CombModelDir="${CombVersDir}/model";
 
-my $AddModelFile="${CombModelDir}/model_${AddVers}";
+my $CombModelFile="${CombModelDir}/model_${AddVers}";
 
 
 
 # just for checking existence of required files and dirs
-my @PriorFiles=($OldModelFile,$AddSeedDir,$TrainCorpus,$TestSentsWest,$TestSentsStd,$SolutionsWest,$SolutionsStd);
+my @PriorFiles=($OldModelFile,$AddSeedDir,$TestSentsWest,$TestSentsStd,$SolutionsWest,$SolutionsStd);
 
 foreach my $File (@PriorFiles) {
     if (! -e $File){
@@ -96,15 +93,37 @@ sub ifnosucess_fail{
     }
 }
 
-sub run_mecab_evaluate{
-    my ($ModelVers)=@_;
-    
-    my $ModelDir=version2subdir("$ModelVers","model");
-    my $CorpusDir=version2subdir("$ModelVers","corpus");
+sub merge_corpora{
+    my @Corpora=@_;
 
-    my $ResultFileStd="${Dir}/${ModelVers}/resultsOnStandardTest.mecab";
-    my $ResultFileWest="${Dir}/${ModelVers}/resultsOnKansaiTest.mecab";
-    my $ScoreFile="${Dir}/${ModelVers}/scores.txt";
+    open(FHw, '>>',$TrainCorpus);
+    foreach my $Corpus (@Corpora){
+	open(FHr,'<', $Corpus);
+	while (<FHr>){
+	    print FHw $_;
+	}
+	close(FHr);
+	    }
+    close(FHw);
+
+    return 1;
+
+}
+
+sub run_mecab_evaluate{
+    my ($TestFileDir,$ModelRtDir)=@_;
+    
+    my $ModelDir="${ModelRtDir}/model";
+    
+    my $TestSentsStd="${TestFileDir}/test_sentences_standard.txt";
+    my $TestSentsWest="${TestFileDir}/test_sentences_kansai.txt";
+    my $SolutionsStd="${TestFileDir}/solutions_standard.mecab";
+    my $SolutionsWest="${TestFileDir}/solutions_kansai.mecab";
+
+    
+    my $ResultFileStd="${ModelRtDir}/resultsOnStandardTest.mecab";
+    my $ResultFileWest="${ModelRtDir}/resultsOnKansaiTest.mecab";
+    my $ScoreFile="${ModelRtDir}/scores.txt";
 
     my $MecabCmdWest="mecab -d $ModelDir $TestSentsWest > $ResultFileWest";
     my $SysReturnMecab1=system($MecabCmdWest);
@@ -114,10 +133,7 @@ sub run_mecab_evaluate{
     my $SysReturnMecab2=system($MecabCmdStd);
     ifnosucess_fail($SysReturnMecab2,"Standard model mecab");
 
-    #=== this is an ad hoc addition by ys to avoid k's prob of CRs, but we should investigate where they come from
-    my @CRTgts=glob("$Dir/$CombVers/results*.mecab");
-    remove_crs_files(@CRTgts);
-    #==================================
+
     
     my $SysReturnEval1=system("python3 $EvalProg $ResultFileWest $SolutionsWest > $ScoreFile");
     ifnosucess_fail($SysReturnEval1,"Kansai model evaluation");
@@ -125,9 +141,10 @@ sub run_mecab_evaluate{
     my $SysReturnEval2=system("python3 $EvalProg $ResultFileStd $SolutionsStd >> $ScoreFile");
     ifnosucess_fail($SysReturnEval1,"Standard model evaluation");
 
-    my @CRTgts=glob("$Dir$AddVers/results*.mecab");
-    remove_crs_files(@CRTgts);
-
+    #=== this is an ad hoc addition by ys to avoid k's prob of CRs, but we should investigate where they come from
+    
+    remove_crs_files(($ResultFileStd,$ResultFileWest));
+    #==================================
     
     print "Results in ${ScoreFile}, the content of which as below (Kansai and standard):\n";
     
@@ -210,11 +227,20 @@ sub remove_crs_file{
 sub main{
  
     print "First we evaluate the original model\n\n";
-    run_mecab_evaluate($OldVers);
+    run_mecab_evaluate($TestFileDir,"${OldDir}/${OldVers}");
 
     my @OldDicConfFPs=glob("${OldModelDir}/*");
     
     print "\nCopying/creating config and dic files for a new model build\n";
+
+    if (! -e $TrainCorpus){
+	my @Corpora=glob("${AddCorpusDir}/*.mecab");
+	if (@Corpora){
+	    merge_corpora(@Corpora) or die;
+	}
+    }
+
+
     prepare_files(@OldDicConfFPs);
 
     my @CRTgts=glob("$AddSeedDir/*.csv");
@@ -222,7 +248,7 @@ sub main{
 
     remove_crs_files(@CRTgts);
 
-    my $MecabLogFP="${Dir}/mecab-train-${CombVers}.log";
+    my $MecabLogFP="${AddDir}/mecab-train-${CombVers}.log";
 
     print "\nGenerating the original dic index\n";
     my $CmdDicInd="mecab-dict-index -d $AddSeedDir -o $AddSeedDir > $MecabLogFP 2>&1";
@@ -239,18 +265,18 @@ sub main{
     }
 
     if ($TrainP eq 'true' || $TrainP eq ""){
-	my $SysReturnTrain=system("mecab-cost-train -M $OldModelFile -d $AddSeedDir $TrainCorpus $AddModelFile >> $MecabLogFP 2>&1");
+	my $SysReturnTrain=system("mecab-cost-train -M $OldModelFile -d $AddSeedDir $TrainCorpus $CombModelFile >> $MecabLogFP 2>&1");
 	ifnosucess_fail($SysReturnTrain,"Retraining ");
     }else{
 	print "\nThis run skips retraining (dic only)\n";
     }
 
     if ($TrainP eq "false"){
-	$AddModelFile=$OldModelFile;
+	$CombModelFile=$OldModelFile;
     }
     
     print "\nRe-building index (this may also take time) ...\n";
-    my $SysReturnDicGen=system("mecab-dict-gen -m $AddModelFile -d $AddSeedDir -o $CombModelDir >> $MecabLogFP 2>&1");
+    my $SysReturnDicGen=system("mecab-dict-gen -m $CombModelFile -d $AddSeedDir -o $CombModelDir >> $MecabLogFP 2>&1");
 
     ifnosucess_fail($SysReturnDicGen,"New dictionary creation");
 
@@ -264,7 +290,7 @@ sub main{
     sleep(2);
 
     print "\nNow we evaluate the new model (fingers crossed)\n";
-    run_mecab_evaluate($CombVers);
+    run_mecab_evaluate($TestFileDir,"${AddDir}/${CombVers}");
 
     print "\nCleaning files to finish up\n";
     final_clean(@OldDicConfFPs,$CombVersDir);
