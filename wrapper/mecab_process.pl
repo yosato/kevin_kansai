@@ -15,12 +15,12 @@
 use strict;
 #use warnings;
 
-my $Usage='mecab_process.pl [root-dir] [old-model] [new-model] <retrain-or-not (bool)>';
+my $Usage='mecab_process.pl [original_dir] [original_model] [additional_dir] [additional_model] [testfile_dir] <retrain-or-not (bool)>';
 
 
 # checking the args
-if (@ARGV<3){
-    print "ERROR: You need at least three arguments\n" . $Usage . "\n";
+if (@ARGV<5){
+    print "ERROR: You need at least five arguments\n" . $Usage . "\n";
     exit;
 }
 
@@ -35,20 +35,22 @@ if ( $Config{osname} eq "windows") {
     $HomeDir='/Users/yosato';
     $HomeDir=$ENV{HOME};
 }
-my $DataDir="$HomeDir/Dropbox/Mecab";
+
+#my $DataDir="$HomeDir/Dropbox/Mecab";
 my $Repo="$HomeDir/kevin_kansai";
 my $EvalProg="${Repo}/eval_progs/eval_mecab.py";
 #my $MecabDir="/usr/local/libexec/mecab";
 #$ENV{PATH} = "$MecabDir:$ENV{PATH}";
 
-my $OldSubDir=$ARGV[0];
-my $OldDir="$DataDir/$OldSubDir";
+my $OldDir=$ARGV[0];
+#my $OldDir="$DataDir/$OldSubDir";
 my $OldVers=$ARGV[1];
-my $AddSubDir=$ARGV[2];
-my $AddDir="$DataDir/$AddSubDir";
+
+my $AddDir=$ARGV[2];
+#my $AddDir="$DataDir/$AddSubDir";
 my $AddVers=$ARGV[3];
-my $TestFileSubDir=$ARGV[4];
-my $TestFileDir="$DataDir/$TestFileSubDir";
+my $TestFileDir=$ARGV[4];
+#my $TestFileDir="$DataDir/$TestFileSubDir";
 my $TrainP=$ARGV[5];
 
 my $TestSentsWest="${TestFileDir}/test_sentences_kansai.txt";
