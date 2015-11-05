@@ -6,7 +6,7 @@ import re, myModule, os
 def extract_sentences(FileP,LineNums='all',ReturnRaw=False,Print=False):
     def chunkprocess(Chunk,ReturnRaw):
         if not ReturnRaw:
-            return Chunk.strip().split('\n')
+            return [ Sent for Sent in Chunk.replace('\r','').strip().split('\n') if Sent ]
     FSr=open(FileP,'rt',encoding='utf-8',errors='replace')
     extract_chunk=lambda FSr: myModule.pop_chunk_from_stream(FSr,Pattern='EOS')
     FSr,Chunk,_,NxtLine=extract_chunk(FSr)
