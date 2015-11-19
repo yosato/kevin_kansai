@@ -1,7 +1,61 @@
-import re, myModule, os
+import re, myModule, os,glob
 
 # Chunk:
 # SentLine:
+
+def format_valid_p(FP,AllowedColumnCnts=[7,9],ErrThresh=50):
+    def stringify_errors(FP,Errors,ErrCnt):
+        Str=''
+        Str+='possibly '+str(ErrCnt)+' errors in this file: '
+        Str+=FP+'\n'
+        for (Genre,ErrLiNes) in Errors.items():
+            for (LineNum,LiNe) in ErrLiNes:
+                Str+=': '.join([Genre,str(LineNum),LiNe])
+        return Str
+    
+    Errors={'trailws':[],'tab':[],'redund_ws':[],'column':[]}
+    ErrCnt=0
+    for Cntr,LiNe in enumerate(open(FP)):
+        if Cntr!=0 and Cntr%1000==0:
+            print(Cntr)
+        Tup=(Cntr+1,LiNe)
+        Line=LiNe.strip()
+        if len(LiNe)-len(Line)>=2:
+            Errors['trailws'].append(Tup)
+            ErrCnt+=1
+        WdFts=Line.split('\t')
+        if len(WdFts)!=2:
+            Errors['tab'].append(Tup)
+            ErrCnt+=1
+            Wd=''.join(WdFts);Fts=''.join(WdFts)
+        else:
+            Wd,Fts=WdFts
+        if re.search(r'\s',Wd) or re.search(r'\s',Fts):
+            Errors['redund_ws'].append(Tup)
+            ErrCnt+=1
+        if len(Fts.split(',')) not in AllowedColumnCnts:
+            Errors['column'].append(Tup)
+            ErrCnt+=1
+            if ErrCnt>ErrThresh:
+                print('too many errors (more than '+str(ErrThresh)+'), stopping')
+                break
+    ErrStr=stringify_errors(FP,Errors,ErrCnt)
+    print(ErrStr)
+    ErrFP=FP+'.errors'
+    if ErrCnt==0:
+        if os.path.isfile(ErrFP):
+            os.remove(ErrFP)
+        else:
+            open(ErrFP,'wt').write(ErrStr)                    
+
+
+
+
+    return Errors
+
+FPs=glob.glob('/home/yosato/Dropbox/Mecab/clean_files/*.mecab')
+for FP in FPs:
+    format_valid_p(FP)
 
 def extract_sentences(FileP,LineNums='all',ReturnRaw=False,Print=False):
     def chunkprocess(Chunk,ReturnRaw):
