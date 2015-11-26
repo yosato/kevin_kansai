@@ -25,20 +25,23 @@ if (@ARGV<5){
 }
 
 my $HomeDir;
+my $Repo;
 use Config;
 
 # more paths may need to be modified/added for your environment
 # the var for home dir different between win/lin
 if ( $Config{osname} eq "windows") {
     $HomeDir="$ENV{HOMEDIR}/$ENV{HOMEPATH}";
+    $Repo="$HomeDir/kevin_kansai";
 } else {
     $HomeDir='/Users/yosato';
     $HomeDir=$ENV{HOME};
+    $Repo="$HomeDir/myProjects/kevin_kansai";
 }
 
 #my $DataDir="$HomeDir/Dropbox/Mecab";
-my $Repo="$HomeDir/kevin_kansai";
-my $EvalProg="${Repo}/eval_progs/eval_mecab.py";
+
+my $EvalProg="${Repo}/myPythonLibs/mecabtools/eval_mecab.py";
 #my $MecabDir="/usr/local/libexec/mecab";
 #$ENV{PATH} = "$MecabDir:$ENV{PATH}";
 
