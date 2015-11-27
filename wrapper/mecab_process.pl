@@ -185,7 +185,16 @@ sub prepare_files{
     use File::Basename;
     use File::Copy;
 
-    my (@OldDicConfFPs)=@_;
+    push(@CRTgts,$TrainCorpus);
+
+        if (! -e $TrainCorpus){
+
+	if (@Corpora){
+	    merge_corpora(@Corpora) or die;
+	}
+    }
+    
+    my (@AddDics,@TrainCorpora,@OldDicConfFPs)=@_;
 
 
     for my $file (@OldDicConfFPs) {
@@ -242,19 +251,16 @@ sub main{
 
     print "\nCopying/creating config and dic files for a new model build\n";
 
-
-    
-    if (! -e $TrainCorpus){
 	my @Corpora=glob("${AddCorpusDir}/*.mecab");
-	if (@Corpora){
-	    merge_corpora(@Corpora) or die;
-	}
-    }
+    
 
-    prepare_files(@OldDicConfFPs);
 
-    my @CRTgts=glob("$AddSeedDir/*.csv");
-    push(@CRTgts,$TrainCorpus);
+        my @CRTgts=glob("$AddSeedDir/*.csv");
+    
+    prepare_files(@AddDics,@TrainCorpora,@OldDicConfFPs);
+
+
+
 
     remove_crs_files(@CRTgts);
 
