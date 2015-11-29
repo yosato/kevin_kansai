@@ -28,7 +28,9 @@ my $HomeDir;
 my $Repo;
 use Config;
 
-# more paths may need to be modified/added for your environment
+
+# some globals
+
 # the var for home dir different between win/lin
 if ( $Config{osname} eq "windows") {
     $HomeDir="$ENV{HOMEDIR}/$ENV{HOMEPATH}";
@@ -39,21 +41,15 @@ if ( $Config{osname} eq "windows") {
     $Repo="$HomeDir/myProjects/kevin_kansai";
 }
 
-#my $DataDir="$HomeDir/Dropbox/Mecab";
-
 my $EvalProg="${Repo}/myPythonLibs/mecabtools/eval_mecab.py";
-#my $MecabDir="/usr/local/libexec/mecab";
-#$ENV{PATH} = "$MecabDir:$ENV{PATH}";
 
 my $OldDir=$ARGV[0];
-#my $OldDir="$DataDir/$OldSubDir";
 my $OldVers=$ARGV[1];
 
+# 'add' is for additional, what you're trying to add
 my $AddDir=$ARGV[2];
-#my $AddDir="$DataDir/$AddSubDir";
 my $AddVers=$ARGV[3];
 my $TestFileDir=$ARGV[4];
-#my $TestFileDir="$DataDir/$TestFileSubDir";
 my $TrainP=$ARGV[5];
 
 my $TestSentsWest="${TestFileDir}/test_sentences_kansai.txt";
@@ -67,15 +63,14 @@ my $OldModelFile="${OldModelDir}/model_${OldVers}.mod";
 my $AddSeedDir="${AddDir}/${AddVers}/seed";
 my $AddCorpusDir="${AddDir}/${AddVers}/corpus";
 
-my $TrainCorpus="${AddCorpusDir}/corpus_train_${AddVers}.mecab";
+my $TrainCorpusFN="corpus_train_${AddVers}.mecab";
+my $TrainCorpus="${AddCorpusDir}/${TrainCorpusFN}";
 
 my $CombVers=$OldVers . '_' . $AddVers;
 my $CombVersDir="${AddDir}/${CombVers}";
 my $CombModelDir="${CombVersDir}/model";
 
 my $CombModelFile="${CombModelDir}/model_${AddVers}";
-
-
 
 # just for checking existence of required files and dirs
 my @PriorFiles=($OldModelFile,$AddSeedDir,$TestSentsWest,$TestSentsStd,$SolutionsWest,$SolutionsStd);
@@ -87,15 +82,64 @@ foreach my $File (@PriorFiles) {
     }
 }
 
-# some functions
+# some major functions
+
+sub prepare_files{
+    use File::Basename;
+    use File::Copy;
+
+    my ($AddDics,$TrainCorpora,$OldDicConfFPs)=@_;
+
+    print "copying original files...\n";
+    # first copy the original dics to the seed dir
+    for my $file (@$OldDicConfFPs) {
+        copy("$file","$AddSeedDir") or die "Copy $file failed";
+    }
+
+    print "resetting parameters in dics...\n";
+    # replace paras of dic lines to zero
+    for my $file (@$AddDics){
+	my $Tmp=$file . '.aaa';
+	open(FHw, '>', );
+	open(FHr,'<', $file);
+	while (my $Line=<FHr>){
+	    # !!! well this doesnt seem to do subs
+	    $Line =~ s/,[0-9]+,[0-9]+,-?[0-9]+,/,0,0,0,/;
+	    print FHw $Line;
+	}
+	close(FHw);
+	close(FHr);
+	copy($Tmp, $file);
+	unlink $Tmp
+    }
+
+    print "merging corpus...\n";
+    my @Corpora;
+    for my $Corpus (@$TrainCorpora){
+	if (basename($Corpus) ne $TrainCorpusFN){
+	    push (@Corpora,$Corpus); 
+	}
+    }
+
+    if (@Corpora){
+	merge_corpora(\@Corpora,$TrainCorpus) or die;
+    }
+
+    my @AllRelFiles;
+    push(@AllRelFiles,$TrainCorpus);
+    push(@AllRelFiles,@$AddDics);
+
+    remove_crs_files(@AllRelFiles);
+}
+
 
 sub ifnosuccess_fail{
     my ($RetVal,$Operation,$LogFP)=@_;
     if ($RetVal!=0){
 	my $FailMess="${Operation} failed\n";
-	open(FHr, '>>', $LogFP); 
-	print FHr $FailMess;
-	close(FHr);
+	open(FHw, '>>', $LogFP); 
+	print FHw $FailMess;
+	close(FHw);
 	die "${Operation} failed\n";
     } else {
 	print "${Operation} succeeded\n";
@@ -103,10 +147,10 @@ sub ifnosuccess_fail{
 }
 
 sub merge_corpora{
-    my @Corpora=@_;
+    my ($Corpora,$DstFP)=@_;
 
-    open(FHw, '>>',$TrainCorpus);
-    foreach my $Corpus (@Corpora){
+    open(FHw, '>',$DstFP);
+    foreach my $Corpus (@$Corpora){
 	open(FHr,'<', $Corpus);
 	while (<FHr>){
 	    print FHw $_;
@@ -114,8 +158,6 @@ sub merge_corpora{
 	close(FHr);
 	    }
     close(FHw);
-
-    return 1;
 
 }
 
@@ -151,8 +193,10 @@ sub run_mecab_evaluate{
     ifnosuccess_fail($SysReturnEval1,"Standard model evaluation",$MecabLogFP);
 
     #=== this is an ad hoc addition by ys to avoid k's prob of CRs, but we should investigate where they come from
+
+    # now dealt with by python prog, should be ok without
     
-    remove_crs_files(($ResultFileStd,$ResultFileWest));
+#    remove_crs_files(($ResultFileStd,$ResultFileWest));
     #==================================
     
     print "Results in ${ScoreFile}, the content of which as below (Kansai and standard):\n";
@@ -181,32 +225,6 @@ sub final_clean{
     }
 }
 
-sub prepare_files{
-    use File::Basename;
-    use File::Copy;
-
-    push(@CRTgts,$TrainCorpus);
-
-        if (! -e $TrainCorpus){
-
-	if (@Corpora){
-	    merge_corpora(@Corpora) or die;
-	}
-    }
-    
-    my (@AddDics,@TrainCorpora,@OldDicConfFPs)=@_;
-
-
-    for my $file (@OldDicConfFPs) {
-        copy("$file","$AddSeedDir") or die "Copy $file failed";
-    }
-
-#    my @DefFNs=('char.def','feature.def','unk.def','rewrite.def','dicrc');
-#    for my $file (@DefFNs) {
-#        copy("${OldModelDir}/${file}","$AddSeedDir") or die "Copy $file failed";
-#    }
-    
-}
 
 sub mkdir_ifnotexists{
     my ($DirN)=@_;
@@ -251,18 +269,10 @@ sub main{
 
     print "\nCopying/creating config and dic files for a new model build\n";
 
-	my @Corpora=glob("${AddCorpusDir}/*.mecab");
+    my @TrainCorpora=glob("${AddCorpusDir}/*.mecab");
+    my @AddDics=glob("$AddSeedDir/*.csv");
     
-
-
-        my @CRTgts=glob("$AddSeedDir/*.csv");
-    
-    prepare_files(@AddDics,@TrainCorpora,@OldDicConfFPs);
-
-
-
-
-    remove_crs_files(@CRTgts);
+    prepare_files(\@AddDics,\@TrainCorpora,\@OldDicConfFPs);
 
     print "\nGenerating the original dic index\n";
     my $CmdDicInd="mecab-dict-index -d $AddSeedDir -o $AddSeedDir > $MecabLogFP 2>&1";
