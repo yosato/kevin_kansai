@@ -72,6 +72,9 @@ my $CombModelDir="${CombVersDir}/model";
 
 my $CombModelFile="${CombModelDir}/model_${AddVers}";
 
+my $MecabLogFP="${AddDir}/mecab-train-${CombVers}.log";
+
+
 # just for checking existence of required files and dirs
 my @PriorFiles=($OldModelFile,$AddSeedDir,$TestSentsWest,$TestSentsStd,$SolutionsWest,$SolutionsStd);
 
@@ -260,19 +263,8 @@ sub remove_crs_file{
 
 }
 
-sub main{
-    my $MecabLogFP="${AddDir}/mecab-train-${CombVers}.log";
-    my @OldDicConfFPs=glob("${OldModelDir}/*");
- 
-    print "First we evaluate the original model\n\n";
-    run_mecab_evaluate($TestFileDir,"${OldDir}/${OldVers}");
 
-    print "\nCopying/creating config and dic files for a new model build\n";
-
-    my @TrainCorpora=glob("${AddCorpusDir}/*.mecab");
-    my @AddDics=glob("$AddSeedDir/*.csv");
-    
-    prepare_files(\@AddDics,\@TrainCorpora,\@OldDicConfFPs);
+sub mecab_process{
 
     print "\nGenerating the original dic index\n";
     my $CmdDicInd="mecab-dict-index -d $AddSeedDir -o $AddSeedDir > $MecabLogFP 2>&1";
@@ -309,6 +301,28 @@ sub main{
 
     print 'Congrats, new combined model re-built (retraining finished)';
     sleep(2);
+}
+
+sub main{
+    # 1. preparing stuff =======================
+
+    my @OldDicConfFPs=glob("${OldModelDir}/*");
+ 
+    print "First we evaluate the original model\n\n";
+    run_mecab_evaluate($TestFileDir,"${OldDir}/${OldVers}");
+
+    print "\nCopying/creating config and dic files for a new model build\n";
+
+    my @TrainCorpora=glob("${AddCorpusDir}/*.mecab");
+    my @AddDics=glob("$AddSeedDir/*.csv");
+    
+    prepare_files(\@AddDics,\@TrainCorpora,\@OldDicConfFPs);
+
+    # 2 the main stuff =========================
+    print "the main process starting...";
+    mecab_process;
+
+    # 3 evaluating and finishing up =============
 
     print "\nNow we evaluate the new model (fingers crossed)\n";
     run_mecab_evaluate($TestFileDir,"${AddDir}/${CombVers}");
@@ -319,6 +333,7 @@ sub main{
     print "Everything is done!!\n\n"
 
 }
+
 
 main;
 
