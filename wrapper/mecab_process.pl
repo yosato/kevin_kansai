@@ -146,6 +146,7 @@ sub ifnosuccess_fail{
 	die "${Operation} failed\n";
     } else {
 	print "${Operation} succeeded\n";
+	return 1;
     }
 }
 
@@ -304,11 +305,13 @@ sub mecab_process{
 }
 
 sub main{
+
     # 1. preparing stuff =======================
 
     my @OldDicConfFPs=glob("${OldModelDir}/*");
  
     print "First we evaluate the original model\n\n";
+    
     run_mecab_evaluate($TestFileDir,"${OldDir}/${OldVers}");
 
     print "\nCopying/creating config and dic files for a new model build\n";
@@ -318,16 +321,22 @@ sub main{
     
     prepare_files(\@AddDics,\@TrainCorpora,\@OldDicConfFPs);
 
+
     # 2 the main stuff =========================
+    
     print "the main process starting...";
+    
     mecab_process;
 
+    
     # 3 evaluating and finishing up =============
 
     print "\nNow we evaluate the new model (fingers crossed)\n";
+    
     run_mecab_evaluate($TestFileDir,"${AddDir}/${CombVers}");
 
     print "\nCleaning files to finish up\n";
+    
     final_clean(@OldDicConfFPs,$CombVersDir);
 
     print "Everything is done!!\n\n"
