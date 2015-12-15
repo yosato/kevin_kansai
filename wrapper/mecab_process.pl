@@ -188,7 +188,10 @@ sub run_mecab_evaluate{
     my $SysReturnMecab2=system($MecabCmdStd);
     ifnosuccess_fail($SysReturnMecab2,"Standard model mecab",$MecabLogFP);
 
-
+    #=== this is an ad hoc addition by ys to avoid k's prob of CRs, but we should investigate where they come from
+    
+    remove_crs_files(($ResultFileStd,$ResultFileWest));
+    #==================================
     
     my $SysReturnEval1=system("python3 $EvalProg $ResultFileWest $SolutionsWest > $ScoreFile");
     ifnosuccess_fail($SysReturnEval1,"Kansai model evaluation",$MecabLogFP);
@@ -196,13 +199,6 @@ sub run_mecab_evaluate{
     my $SysReturnEval2=system("python3 $EvalProg $ResultFileStd $SolutionsStd >> $ScoreFile");
     ifnosuccess_fail($SysReturnEval1,"Standard model evaluation",$MecabLogFP);
 
-    #=== this is an ad hoc addition by ys to avoid k's prob of CRs, but we should investigate where they come from
-
-    # now dealt with by python prog, should be ok without
-    
-#    remove_crs_files(($ResultFileStd,$ResultFileWest));
-    #==================================
-    
     print "Results in ${ScoreFile}, the content of which as below (Kansai and standard):\n";
     
     open(my $ScoreFSr, '<', $ScoreFile);
