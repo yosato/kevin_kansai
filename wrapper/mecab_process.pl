@@ -15,7 +15,7 @@
 use strict;
 #use warnings;
 
-my $Usage='mecab_process.pl [original_dir] [original_model] [additional_dir] [additional_model] [testfile_dir] <retrain-or-not (bool)>';
+my $Usage='mecab_process.pl [original_dir] [original_model] [additional_dir] [additional_model] [testfile_dir] <retrain-or-not, 1 or 0> <eval-only, 1 or 0>';
 
 
 # checking the args
@@ -51,6 +51,7 @@ my $AddDir=$ARGV[2];
 my $AddVers=$ARGV[3];
 my $TestFileDir=$ARGV[4];
 my $TrainP=$ARGV[5];
+my $EvalOnlyP=$ARGV[6];
 
 my $TestSentsWest="${TestFileDir}/test_sentences_kansai.txt";
 my $TestSentsStd="${TestFileDir}/test_sentences_standard.txt";
@@ -310,6 +311,8 @@ sub main{
     
     run_mecab_evaluate($TestFileDir,"${OldDir}/${OldVers}");
 
+    if (! $EvalOnlyP){
+	
     print "\nCopying/creating config and dic files for a new model build\n";
 
     my @TrainCorpora=glob("${AddCorpusDir}/*.mecab");
@@ -324,6 +327,7 @@ sub main{
     
     mecab_process;
 
+    }
     
     # 3 evaluating and finishing up =============
 
