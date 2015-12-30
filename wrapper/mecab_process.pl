@@ -306,6 +306,7 @@ sub mecab_process{
 
     if ($TrainP eq 'true' || $TrainP eq ""){
 	my $CmdRetrain=cmd_withredir("mecab-cost-train -M $OldModelFile -d $AddSeedDir $TrainCorpus $CombModelFile",$Debug,0,$MecabLogFP);
+	print $CmdRetrain;
 	my $SysReturnTrain=system($CmdRetrain);
 	#print $SysReturnTrain;
 	ifnosuccess_fail($SysReturnTrain,"Retraining",$MecabLogFP);
