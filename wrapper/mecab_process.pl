@@ -18,6 +18,9 @@ use strict;
 my $Usage='mecab_process.pl [original_dir] [original_model] [additional_dir] [additional_model] [testfile_dir] <retrain-or-not, 1 or 0> <eval-only, 1 or 0>';
 
 
+my $Debug=1;
+
+
 # checking the args
 if (@ARGV<5){
     print "ERROR: You need at least five arguments\n" . $Usage . "\n";
@@ -27,7 +30,6 @@ if (@ARGV<5){
 my $HomeDir;
 my $Repo;
 use Config;
-
 
 # some globals
 
@@ -81,7 +83,7 @@ my @PriorFiles=($OldModelFile,$AddSeedDir,$TestSentsWest,$TestSentsStd,$Solution
 
 foreach my $File (@PriorFiles) {
     if (! -e $File){
-	print "$File does not exist\n";
+	print "\n$File does not exist\n";
 	exit;
     }
 }
@@ -140,13 +142,13 @@ sub prepare_files{
 sub ifnosuccess_fail{
     my ($RetVal,$Operation,$LogFP)=@_;
     if ($RetVal!=0){
-	my $FailMess="${Operation} failed\n";
+	my $FailMess="\n${Operation} failed\n";
 	open(FHw, '>>', $LogFP); 
 	print FHw $FailMess;
 	close(FHw);
-	die "${Operation} failed\n";
+	die "\n${Operation} failed\n";
     } else {
-	print "${Operation} succeeded\n";
+	print "\n${Operation} succeeded\n";
 	return 1;
     }
 }
@@ -193,11 +195,15 @@ sub run_mecab_evaluate{
     
     remove_crs_files(($ResultFileStd,$ResultFileWest));
     #==================================
-    
-    my $SysReturnEval1=system("python3 $EvalProg $ResultFileWest $SolutionsWest > $ScoreFile");
-    ifnosuccess_fail($SysReturnEval1,"Kansai model evaluation",$MecabLogFP);
 
-    my $SysReturnEval2=system("python3 $EvalProg $ResultFileStd $SolutionsStd >> $ScoreFile");
+    print 'Evaluating Kansai model';
+    my $KansaiEvalCmd="python3 $EvalProg $ResultFileWest $SolutionsWest";
+    my $SysReturnEval1=system("$KansaiEvalCmd > $ScoreFile");
+    if ($Debug){print "$KansaiEvalCmd $SysReturnEval1";}
+    ifnosuccess_fail($SysReturnEval1,"Kansai model evaluation",$MecabLogFP);
+    print 'Evaluating standard model';
+    my $StdEvalCmd="python3 $EvalProg $ResultFileStd $SolutionsStd";
+    my $SysReturnEval2=system("$StdEvalCmd >> $ScoreFile");
     ifnosuccess_fail($SysReturnEval1,"Standard model evaluation",$MecabLogFP);
 
     print "Results in ${ScoreFile}, the content of which as below (Kansai and standard):\n";
@@ -261,11 +267,32 @@ sub remove_crs_file{
 
 }
 
-
+sub cmd_withredir{
+    my ($Cmd,$Debug,$FstTime,$LogFP)=@_;
+    my $Tee;
+    my $Redir;
+    if ($Debug){
+	$Tee=' | tee ';
+	if (! $FstTime){
+	    $Tee="${Tee} -a";
+	}
+    } else {
+	$Tee='';
+    }
+    if ($Debug){
+	    $Redir=''
+	}elsif($FstTime){
+	    $Redir='>';
+        }else{
+	   $Redir='>>';
+        }
+    return "${Cmd} ${Tee} ${Redir} ${LogFP} 2>&1";
+    
+}
 sub mecab_process{
 
     print "\nGenerating the original dic index\n";
-    my $CmdDicInd="mecab-dict-index -d $AddSeedDir -o $AddSeedDir > $MecabLogFP 2>&1";
+    my $CmdDicInd=cmd_withredir("mecab-dict-index -d $AddSeedDir -o $AddSeedDir ",$Debug,1,$MecabLogFP);
     my $SysReturnDicInd=system($CmdDicInd);
     
     ifnosuccess_fail($SysReturnDicInd,"Orig dic indexing",$MecabLogFP);
@@ -278,8 +305,10 @@ sub mecab_process{
     }
 
     if ($TrainP eq 'true' || $TrainP eq ""){
-	my $SysReturnTrain=system("mecab-cost-train -M $OldModelFile -d $AddSeedDir $TrainCorpus $CombModelFile >> $MecabLogFP 2>&1");
-	ifnosuccess_fail($SysReturnTrain,"Retraining ",$MecabLogFP);
+	my $CmdRetrain=cmd_withredir("mecab-cost-train -M $OldModelFile -d $AddSeedDir $TrainCorpus $CombModelFile",$Debug,0,$MecabLogFP);
+	my $SysReturnTrain=system($CmdRetrain);
+	#print $SysReturnTrain;
+	ifnosuccess_fail($SysReturnTrain,"Retraining",$MecabLogFP);
     }else{
 	print "\nThis run skips retraining (dic only)\n";
     }
