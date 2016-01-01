@@ -197,12 +197,12 @@ sub run_mecab_evaluate{
     #==================================
 
     print 'Evaluating Kansai model';
-    my $KansaiEvalCmd="python3 $EvalProg $ResultFileWest $SolutionsWest";
+    my $KansaiEvalCmd="python3 $EvalProg -r $ResultFileWest -s $SolutionsWest";
     my $SysReturnEval1=system("$KansaiEvalCmd > $ScoreFile");
     if ($Debug){print "$KansaiEvalCmd $SysReturnEval1";}
     ifnosuccess_fail($SysReturnEval1,"Kansai model evaluation",$MecabLogFP);
     print 'Evaluating standard model';
-    my $StdEvalCmd="python3 $EvalProg $ResultFileStd $SolutionsStd";
+    my $StdEvalCmd="python3 $EvalProg -r $ResultFileStd -s $SolutionsStd";
     my $SysReturnEval2=system("$StdEvalCmd >> $ScoreFile");
     ifnosuccess_fail($SysReturnEval1,"Standard model evaluation",$MecabLogFP);
 
