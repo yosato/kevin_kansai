@@ -289,6 +289,7 @@ sub cmd_withredir{
     return "${Cmd} ${Tee} ${Redir} ${LogFP} 2>&1";
     
 }
+
 sub mecab_process{
 
     print "\nGenerating the original dic index\n";
