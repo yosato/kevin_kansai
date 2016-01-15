@@ -73,7 +73,7 @@ my $CombVers=$OldVers . '_' . $AddVers;
 my $CombVersDir="${AddDir}/${CombVers}";
 my $CombModelDir="${CombVersDir}/model";
 
-my $CombModelFile="${CombModelDir}/model_${AddVers}";
+my $CombModelFile="${CombModelDir}/model_${CombVers}.mod";
 
 my $MecabLogFP="${AddDir}/mecab-train-${CombVers}.log";
 
