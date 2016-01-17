@@ -30,7 +30,7 @@ class TestEvalMecab(unittest.TestCase):
         RawPairs=[(RawPair[0],RawPair[1],RawPair[2]) for RawPair in (self.Pair1,self.Pair2,self.Pair3)]
         self.Pairs=[ (eval_mecab.process_chunk(RawPair[0]),eval_mecab.process_chunk(RawPair[1]),RawPair[2]) for RawPair in RawPairs]
         
-        
+    def test_
     def test_score_sent(self):
         set_trace()
         for Pair in self.Pairs:

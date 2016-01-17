@@ -399,24 +399,6 @@ def destringify_halfjsonablecollection(StringifiedTuple):
 
 
 
-def ask_filenoexist_execute_json(FP,Function,ArgsKArgs,Message='Use the old file',TO=10,DefaultReuse=True,Backup=True):
-    import json
-    Response=ask_filenoexist_execute(FP,Function,ArgsKArgs,Message=Message,TO=TO,DefaultReuse=DefaultReuse,Backup=Backup)
-    if Response is False:
-        Json=json.loads(open(FP,'rt').read())
-        Object=dejsonify_diclist(Json)
-        return Object,False
-    else:
-        (Bool,DirectP)=jsonable_p(Response)
-        if not Bool:
-            print('not jsonable, only returning the object')
-        elif DirectP:
-            ToJson=Response
-        else:
-            ToJson=jsonify_diclist(Response)
-        open(FP,'wt').write(json.dumps(ToJson))
-        return Response,True
-
 def ask_filenoexist_execute(FPs,Function,ArgsKArgs,Message='Use the old file',TO=10,DefaultReuse=True,Backup=True):
     if type(FPs).__name__=='str':
         FPs=[FPs]
@@ -1924,7 +1906,25 @@ def destringify_halfjsonable(StringifiedTuple):
         return tuple(Els)
 
 
+def ask_filenoexist_execute_json(FP,Function,ArgsKArgs,Message='Use the old file',TO=10,DefaultReuse=True,Backup=True):
+    import json
+    Response=ask_filenoexist_execute(FP,Function,ArgsKArgs,Message=Message,TO=TO,DefaultReuse=DefaultReuse,Backup=Backup)
+    if Response is False:
+        Json=json.loads(open(FP,'rt').read())
+        #Object=dejsonify_diclist(Json)
+        return Json
+    else:
+        (Bool,DirectP)=jsonable_p(Response)
+        if not Bool:
+            print('not jsonable, only returning the object')
+        elif DirectP:
+            ToJson=Response
+        else:
+            ToJson=jsonify_diclist(Response)
+        open(FP,'wt').write(json.dumps(ToJson))
+        return Response
 
+'''
 def ask_filenoexist_execute_json(FP,Function,ArgsKArgs,Message='Use the old file',TO=10,DefaultReuse=True,Backup=True):
     import json
     Response=ask_filenoexist_execute(FP,Function,ArgsKArgs,Message=Message,TO=TO,DefaultReuse=DefaultReuse,Backup=Backup)
@@ -1942,7 +1942,7 @@ def ask_filenoexist_execute_json(FP,Function,ArgsKArgs,Message='Use the old file
             ToJson=jsonify_diclist(Response)
         open(FP,'wt').write(json.dumps(ToJson))
         return Response
-
+'''
 
     
     
