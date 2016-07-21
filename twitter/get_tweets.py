@@ -4,8 +4,10 @@ import getopt
 import tweepy
 from time import sleep, time
 from datetime import datetime
-import langid
+#import langid
 import json
+
+
 
 def crawl_tweets(language, file_words=None, file_geocodes=None, fileout=None, verbose=False):
 
@@ -30,9 +32,10 @@ def crawl_tweets(language, file_words=None, file_geocodes=None, fileout=None, ve
     if file_geocodes is not None:
         with open(os.path.abspath(file_geocodes), 'r') as file_geocodes_obj:
             for line in file_geocodes_obj:
-                # each line is made of 5 fields separated by ';' but the geocode format 
-                # needed for twitter is only the 3 first fields, separated by ','
-                geocodes.append(','.join(line.strip().split(';')[:3]))
+                if not line.startswith('#'):
+                    # each line is made of 5 fields separated by ';' but the geocode format 
+                    # needed for twitter is only the 3 first fields, separated by ','
+                    geocodes.append(','.join(line.strip().split(';')[:3]))
         if len(geocodes) != len(set(geocodes)):
             msg = "[WARNING] %s: file %s contains duplicate lines\n" % (os.path.basename(__file__), file_geocodes)
             sys.stderr.write(msg)
@@ -124,8 +127,8 @@ def crawl_tweets(language, file_words=None, file_geocodes=None, fileout=None, ve
                 user_dict[screen_name] = None
                 return True
             # for new users, we check if they do post in the desired language
-            if langid_guess_language(timeline) != language:
-                sys.stderr.write(datetime.now().isoformat() + '\tNew user ' + screen_name + ' [' + retrieval_method + '] timeline did not pass the language filter\n')
+            #if langid_guess_language(timeline) != language:
+            #    sys.stderr.write(datetime.now().isoformat() + '\tNew user ' + screen_name + ' [' + retrieval_method + '] timeline did not pass the language filter\n')
                 # None value for a user in the user_dict indicates an already seen user filtered out (here, by language guessing)
                 user_dict[screen_name] = None
                 return True
@@ -284,7 +287,7 @@ Mandatory arguments to long options are mandatory for short options too.
     SLEEP_BETWEEN_ITERATIONS = 60             # number of seconds
     ITERATION_COUNT = 0                       # 0 for unlimited number of iterations
     CRAWL_NEW_TWEETS_FROM_SEEN_USERS = False   # if set to True, will iterate on all kept users in order to crawl their new tweets
-    MINIMAL_NUM_OF_TWEETS = 100               # minimal num of tweets to decide to keep a user
+    MINIMAL_NUM_OF_TWEETS = 10               # minimal num of tweets to decide to keep a user
     NUMBER_OF_TWEETS_TO_RETRIEVE = 100        # max num of tweets to be returned the first time we retrieve one user's timeline
 
     wait_timeline = 5
