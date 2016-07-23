@@ -1,15 +1,68 @@
 import sys
-import os.path
-import getopt
+from pdb import set_trace
+import os.path,sys
+import argparse
 import tweepy
 from time import sleep, time
 from datetime import datetime
-#import langid
+import langid
 import json
 
+from pythonlib_ys import main as myModule
+
+class listener(tweepy.StreamListener):
+
+    def on_data(self, data):
+        print(data)
+        return(True)
+
+    def on_error(self, status):
+        print(status)
+
+def get_keys(FP):
+    Keys=open(FP).read().strip().split('\n')
+    if len(Keys)!=4:
+        sys.exit('there have to be four keys')
+    return Keys
+
+def get_locations(FP,TgtPlaces=[]):
+    Locs=[]
+    TgtPlacesL=[ TgtPlace.lower() for TgtPlace in TgtPlaces ]
+    with open(FP) as FSr:
+        for LiNe in FSr:
+            if LiNe.strip():
+                NameCoordStrs=LiNe.strip().split('\t')
+                CoordStrs=NameCoordStrs[1].split(',')
+
+                if not TgtPlacesL:
+                    DoIt=True
+                else:
+                    CandNameL=NameCoordStrs[0].lower()
+                    if CandNameL in TgtPlacesL:
+                        DoIt=True
+                    else:
+                        DoIt=False
+                if not DoIt:
+                    continue
+                else:
+                    CoordPairs=[float(CoordStr) for CoordStr in CoordStrs ]
+                    Locs.extend(CoordPairs)
+
+    return Locs
 
 
-def crawl_tweets(language, file_words=None, file_geocodes=None, fileout=None, verbose=False):
+def get_tweets_stream(Lang,AuthkeyFile,GeocodeFile,TgtPlaces=[]):
+    if TgtPlaces:
+        sys.stderr.write('we only do these places :'+repr(TgtPlaces)+'\n')
+    (ckey,csecret,atoken,asecret)=get_keys(AuthkeyFile)
+    auth = tweepy.OAuthHandler(ckey, csecret)
+    auth.set_access_token(atoken, asecret)
+
+    twitterStream = tweepy.Stream(auth, listener())
+    Locs=get_locations(GeocodeFile,TgtPlaces=TgtPlaces)
+    twitterStream.filter(locations=Locs)
+
+def get_tweets_rest(language, file_words=None, file_geocodes=None, fileout=None, verbose=False):
 
     if fileout:
         try:
@@ -40,15 +93,8 @@ def crawl_tweets(language, file_words=None, file_geocodes=None, fileout=None, ve
             msg = "[WARNING] %s: file %s contains duplicate lines\n" % (os.path.basename(__file__), file_geocodes)
             sys.stderr.write(msg)
 
-    def get_keys(FP):
-        Keys=open(FP).read().strip().split()
-        if len(Keys)!=4:
-            sys.exit('there have to be four keys')
-            
-        return Keys
-    #('dC6ADJaWLmsRpKRYljlStA','VUFdqwyrjWV5ZalItK2YHtXpDPwmpVmylsdaxszcas','2250191778-xKPJPfFqcbBgHIgwDbzvSsngmLVLfunTogK9WYn','57wAnUXbWg9a7KYFWGavsdU6UFNqBaZmvNngWjZ8UelqF')
-    (CONSUMER_KEY,CONSUMER_SECRET,ACCESS_TOKEN,ACCESS_TOKEN_SECRET)=get_keys('keys.txt')
 
+    (CONSUMER_KEY,CONSUMER_SECRET,ACCESS_TOKEN,ACCESS_TOKEN_SECRET)=get_keys('keys.txt')
 
     auth = tweepy.OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
     auth.set_access_token(ACCESS_TOKEN, ACCESS_TOKEN_SECRET)
@@ -263,28 +309,35 @@ def crawl_tweets(language, file_words=None, file_geocodes=None, fileout=None, ve
     if fileout_obj.name != "<stdout>":
         fileout_obj.close()
 
+def main():
+    msg = "PYTHON VERSION: %s\n" % sys.version
+    sys.stderr.write(msg)
+    sys.stderr.flush()
+    msg = "TWEEPY VERSION: %s\n" % tweepy.__version__
+    sys.stderr.write(msg)
+    sys.stderr.flush()
 
+    # SANITY_CHECK
+    if NUMBER_OF_TWEETS_TO_RETRIEVE < MINIMAL_NUM_OF_TWEETS:
+        sys.stderr.write("[ERROR] NUMBER_OF_TWEETS_TO_RETRIEVE is smaller than MINIMAL_NUM_OF_TWEETS\n")
+        sys.stderr.write("Please, set proper values.\n")
+        sys.exit(2)
+
+    ArgParser=argparse.ArgumentParser()
+    ArgParser.add_argument('-l','--lang',required=True)
+    ArgParser.add_argument('-g','--geocode-file',required=True)
+    ArgParser.add_argument('-k','--authkey-file',required=True)
+    ArgParser.add_argument('-p','--target-places',nargs='+',type=str,default=[])
+    #ArgParser.add_argument('--timeout',default='2h')
+    Args=ArgParser.parse_args()
+
+    #TOInSecs=myModule.timestr2seconds(Args.timeout)
+    
+    get_tweets_stream(Lang=Args.lang, AuthkeyFile=Args.authkey_file,GeocodeFile=Args.geocode_file,TgtPlaces=Args.target_places)
+    #TimeOut=TOInSecs)
+        
 if __name__ == "__main__":
-
-    def usage():
-        msg = """Usage: crawl_tweets.py [-vh] [-o OFILE] [-w WFILE] [-g GFILE] LGCODE
-
-Connect to the Twitter REST API and send requests through the Twitter SEARCH API
-in order to retrieve raw tweets data that will be used to build a language
-specific (LGCODE) twitter corpus. Each request is made up of a word from the seed
-words file (WFILE) AND/OR a geocode from the geocodes file (GFILE).
-So you have to give as parameters either -w WFILE and -g GFILE or only one of them.
-
-Mandatory arguments to long options are mandatory for short options too.
-  -w, --words-file=WFILE      use the seed words in WFILE
-  -g, --geocodes-file=GFILE   use the geocodes data in GFILE
-  -o, --output=OFILE          write result to OFILE instead of standard output
-  -v, --verbose               be verbose
-  -h, --help                  display this help and exit
-"""
-        sys.stderr.write(msg)
-
-    SLEEP_BETWEEN_ITERATIONS = 60             # number of seconds
+    SLEEP_BETWEEN_ITERATIONS = 30             # number of seconds
     ITERATION_COUNT = 0                       # 0 for unlimited number of iterations
     CRAWL_NEW_TWEETS_FROM_SEEN_USERS = False   # if set to True, will iterate on all kept users in order to crawl their new tweets
     MINIMAL_NUM_OF_TWEETS = 10               # minimal num of tweets to decide to keep a user
@@ -303,63 +356,9 @@ Mandatory arguments to long options are mandatory for short options too.
     # list of languages supported by langid
     LIST_OF_SUPPORTED_LANGUAGES = ['af', 'am', 'an', 'ar', 'as', 'az', 'be', 'bg', 'bn', 'br', 'bs', 'ca', 'cs', 'cy', 'da', 'de', 'dz', 'el', 'en', 'eo', 'es', 'et', 'eu', 'fa', 'fi', 'fo', 'fr', 'ga', 'gl', 'gu', 'he', 'hi', 'hr', 'ht', 'hu', 'hy', 'id', 'is', 'it', 'ja', 'jv', 'ka', 'kk', 'km', 'kn', 'ko', 'ku', 'ky', 'la', 'lb', 'lo', 'lt', 'lv', 'mg', 'mk', 'ml', 'mn', 'mr', 'ms', 'mt', 'nb', 'ne', 'nl', 'nn', 'no', 'oc', 'or', 'pa', 'pl', 'ps', 'pt', 'qu', 'ro', 'ru', 'rw', 'se', 'si', 'sk', 'sl', 'sq', 'sr', 'sv', 'sw', 'ta', 'te', 'th', 'tl', 'tr', 'ug', 'uk', 'ur', 'vi', 'vo', 'wa', 'xh', 'zh', 'zu']
 
-    try:
-        opts, args = getopt.getopt(sys.argv[1:], "w:g:ho:v", ["words-file=", "geocodes-file=", "help", "output=", "verbose"])
-    except getopt.GetoptError as e:
-        sys.stderr.write(str(e)) # will print something like "option -a not recognized"
-        usage()
-        sys.exit(2)
-        
-    msg = "PYTHON VERSION: %s\n" % sys.version
-    sys.stderr.write(msg)
-    sys.stderr.flush()
-    msg = "TWEEPY VERSION: %s\n" % tweepy.__version__
-    sys.stderr.write(msg)
-    sys.stderr.flush()
 
-    # SANITY_CHECK
-    if NUMBER_OF_TWEETS_TO_RETRIEVE < MINIMAL_NUM_OF_TWEETS:
-        sys.stderr.write("[ERROR] NUMBER_OF_TWEETS_TO_RETRIEVE is smaller than MINIMAL_NUM_OF_TWEETS\n")
-        sys.stderr.write("Please, set proper values.\n")
-        sys.exit(2)
+    
+    main()
 
-    fileout = language = file_words = file_geocodes = None
-    verbose_mode = False
 
-    for o, a in opts:
-        if o in ("-v", "--verbose"):
-            verbose_mode = True
-        elif o in ("-h", "--help"):
-            usage()
-            sys.exit()
-        elif o in ("-o", "--output"):
-            fileout = a.strip()
-        elif o in ("-w", "--words-file"):
-            file_words = a.strip()
-        elif o in ("-g", "--geocodes-file"):
-            file_geocodes = a.strip()
-        else:
-            assert False, "unhandled option"
-
-    if len(args) != 1:
-        print(len(args))
-        usage()
-        sys.exit(2)
-    else:
-        language = args[0]
-
-    # SANITY_CHECK
-    if language not in LIST_OF_SUPPORTED_LANGUAGES:
-        sys.stderr.write("[ERROR] language not in the list of supported languages:\n")
-        sys.stderr.write(' '.join(LIST_OF_SUPPORTED_LANGUAGES))
-        sys.stderr.write("\n")
-        usage()
-        sys.exit(2)
-
-    # SANITY_CHECK
-    if file_words is None and file_geocodes is None:
-        sys.stderr.write("[ERROR] Please, do provide a words file AND/OR a geocodes file\n")
-        usage()
-        sys.exit(2)
-
-    crawl_tweets(language, file_words, file_geocodes, fileout, verbose_mode)
+#    main(language=Args.lang, file_words=None, file_geocodes=Args.geocode_file, fileout=None, verbose=False)
