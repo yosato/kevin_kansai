@@ -11,9 +11,11 @@ import json
 from pythonlib_ys import main as myModule
 
 class listener(tweepy.StreamListener):
-
+    def __init__(self,FSwOrStdOut):
+        self.out=FSwOrStdOut
+    
     def on_data(self, data):
-        print(data)
+        self.out.write(data+'\n')
         return(True)
 
     def on_error(self, status):
@@ -24,6 +26,20 @@ def get_keys(FP):
     if len(Keys)!=4:
         sys.exit('there have to be four keys')
     return Keys
+
+def geo_valid_p(Long,Lat):
+    return myModule.in_range(Long,(-180,180)) and myModule.in_range(Lat,(-90,90))
+
+def coordpairs_wellformed_p(CoordPairs):
+    Cond1=len(CoordPairs)==4
+    CoordSW=CoordPairs[:2];CoordCentre=CoordPairs[2:]
+    Cond2=geo_valid_p(CoordSW[0],CoordSW[1]) and geo_valid_p(CoordCentre[0],CoordCentre[1])
+    Cond3=CoordSW[0]<CoordCentre[0] and CoordSW[1]<CoordCentre[1]
+    Conds=[Cond1,Cond2,Cond3]
+    if all(Conds):
+        return True
+    else:
+        return False
 
 def get_locations(FP,TgtPlaces=[]):
     Locs=[]
@@ -46,21 +62,34 @@ def get_locations(FP,TgtPlaces=[]):
                     continue
                 else:
                     CoordPairs=[float(CoordStr) for CoordStr in CoordStrs ]
+                    if not coordpairs_wellformed_p(CoordPairs):
+                        sys.stderr.write('\n[warning get_locations] this coordinates skipped, not well formed: '+repr(CoordPairs)+'\n')
                     Locs.extend(CoordPairs)
-
+    if not Locs:
+        sys.exit('\n[Error get_locations] no locations extracted\n')
+                    
     return Locs
 
 
-def get_tweets_stream(Lang,AuthkeyFile,GeocodeFile,TgtPlaces=[]):
+def get_tweets_stream(Lang,AuthkeyFile,GeocodeFile,TgtPlaces=[],OutputFP=None):
+    if not OutputFP:
+        Out=sys.stdout
+    else:
+        Out=open(OutputFP,'wt')
+        sys.stderr.write('\n dest file name: '+OutputFP+'\n')
+                                         
     if TgtPlaces:
-        sys.stderr.write('we only do these places :'+repr(TgtPlaces)+'\n')
+        sys.stderr.write('\nwe only do these places :'+repr(TgtPlaces)+'\n')
     (ckey,csecret,atoken,asecret)=get_keys(AuthkeyFile)
     auth = tweepy.OAuthHandler(ckey, csecret)
     auth.set_access_token(atoken, asecret)
 
-    twitterStream = tweepy.Stream(auth, listener())
+    twitterStream = tweepy.Stream(auth, listener(Out))
     Locs=get_locations(GeocodeFile,TgtPlaces=TgtPlaces)
     twitterStream.filter(locations=Locs)
+
+    if OutputFP:
+        Out.close()
 
 def get_tweets_rest(language, file_words=None, file_geocodes=None, fileout=None, verbose=False):
 
@@ -328,12 +357,17 @@ def main():
     ArgParser.add_argument('-g','--geocode-file',required=True)
     ArgParser.add_argument('-k','--authkey-file',required=True)
     ArgParser.add_argument('-p','--target-places',nargs='+',type=str,default=[])
+    ArgParser.add_argument('-o','--output-fpstem',default=None)
     #ArgParser.add_argument('--timeout',default='2h')
     Args=ArgParser.parse_args()
 
     #TOInSecs=myModule.timestr2seconds(Args.timeout)
+
+    Now=datetime.now()
+    NowStr=Now.strftime('%y%m%d-%H%M')
+    OutputFP=(None if not Args.output_fpstem else Args.output_fpstem+'_'+NowStr+'.json')
     
-    get_tweets_stream(Lang=Args.lang, AuthkeyFile=Args.authkey_file,GeocodeFile=Args.geocode_file,TgtPlaces=Args.target_places)
+    get_tweets_stream(Lang=Args.lang, AuthkeyFile=Args.authkey_file,GeocodeFile=Args.geocode_file,TgtPlaces=Args.target_places,OutputFP=OutputFP)
     #TimeOut=TOInSecs)
         
 if __name__ == "__main__":
