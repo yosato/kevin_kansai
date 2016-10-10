@@ -5,22 +5,83 @@ import argparse
 import tweepy
 from time import sleep, time
 from datetime import datetime
+from tweepy.models import Status
 import langid
 import json
 
 from pythonlib_ys import main as myModule
 
-class listener(tweepy.StreamListener):
-    def __init__(self,FSwOrStdOut):
-        self.out=FSwOrStdOut
-    
-    def on_data(self, data):
-        self.out.write(data+'\n')
-        return(True)
 
+class Listener(tweepy.StreamListener):
+    def __init__(self,FSwOrStdOut,Debug=True):
+        super().__init__()
+        self.out=FSwOrStdOut
+        self.tweetCounter=0
+        self.debug=Debug
+#    def on_data(self, data):
+ #      self.out.write(data+'\n')
+  #      return(True)
+
+    def on_data(self, raw_data):
+        """Called when raw data is received from connection.
+
+        Override this method if you wish to manually handle
+        the stream data. Return False to stop stream and close connection.
+        """
+        self.out.write(raw_data)
+        data = json.loads(raw_data)
+
+        if 'in_reply_to_status_id' in data:
+            status = Status.parse(self.api, data)
+            if self.on_status(status) is False:
+                return False
+        elif 'delete' in data:
+            delete = data['delete']['status']
+            if self.on_delete(delete['id'], delete['user_id']) is False:
+                return False
+        elif 'event' in data:
+            status = Status.parse(self.api, data)
+            if self.on_event(status) is False:
+                return False
+        elif 'direct_message' in data:
+            status = Status.parse(self.api, data)
+            if self.on_direct_message(status) is False:
+                return False
+        elif 'friends' in data:
+            if self.on_friends(data['friends']) is False:
+                return False
+        elif 'limit' in data:
+            if self.on_limit(data['limit']['track']) is False:
+                return False
+        elif 'disconnect' in data:
+            if self.on_disconnect(data['disconnect']) is False:
+                return False
+        elif 'warning' in data:
+            if self.on_warning(data['warning']) is False:
+                return False
+        else:
+            logging.error("Unknown message type: " + str(raw_data))
+
+  
     def on_error(self, status):
         print(status)
+    
+    
+    def on_status(self, status):
+#        print("screen_name='%s' tweet='%s'"%(status.author.screen_name, status.text))
+        if self.debug:
+            sys.stderr.write('\n'.join([status.author.screen_name,status.text,repr(status.coordinates),repr(status.place)])+'\n\n')
+        self.tweetCounter = self.tweetCounter + 1
+ #       print(self.tweetCounter)
 
+        if self.tweetCounter < self.stopAt:
+            return True
+        else:
+            print('maxnum = '+str(self.tweetCounter)+' reached')
+        return False
+
+
+        
 def get_keys(FP):
     Keys=open(FP).read().strip().split('\n')
     if len(Keys)!=4:
@@ -40,6 +101,12 @@ def coordpairs_wellformed_p(CoordPairs):
         return True
     else:
         return False
+
+def get_locationsets(FP,TgtPlaceSets=[]):
+    LocSets=[]
+    for TgtPlaces in TgtPlaceSets:
+        LocSets.append(get_locations(FP,TgtPlaces))
+    return LocSets
 
 def get_locations(FP,TgtPlaces=[]):
     Locs=[]
@@ -61,32 +128,46 @@ def get_locations(FP,TgtPlaces=[]):
                 if not DoIt:
                     continue
                 else:
-                    CoordPairs=[float(CoordStr) for CoordStr in CoordStrs ]
+                    CoordPairs=tuple([float(CoordStr) for CoordStr in CoordStrs ])
                     if not coordpairs_wellformed_p(CoordPairs):
                         sys.stderr.write('\n[warning get_locations] this coordinates skipped, not well formed: '+repr(CoordPairs)+'\n')
-                    Locs.extend(CoordPairs)
+                    Locs.append(CoordPairs)
     if not Locs:
         sys.exit('\n[Error get_locations] no locations extracted\n')
                     
     return Locs
 
+def main0(Lang,AuthkeyFile,GeocodeFile,TgtPlaceSets,OutputDir=None):
+    LocSets=get_locationsets(GeocodeFile,TgtPlaceSets=TgtPlaceSets)
+    for (TgtPlaces,LocSet) in zip(TgtPlaceSets,LocSets):
+        Now=datetime.now()
+        NowStr='-'.join([str(Now.date()),str(Now.hour),str(Now.minute)])
+        OutputFP=os.path.join(OutputDir,'-'.join(TgtPlaces)+'_'+NowStr+'.json')
+        
+        Locs=myModule.flatten_list(LocSet)
+        get_tweets_stream(Lang,AuthkeyFile,Locs,MaxTweets=1000,OutputFP=OutputFP)
 
-def get_tweets_stream(Lang,AuthkeyFile,GeocodeFile,TgtPlaces=[],OutputFP=None):
+
+        
+def get_tweets_stream(Lang,AuthkeyFile,Locations,MaxTweets=float('inf'),OutputFP=None,TimeOut=None):
     if not OutputFP:
         Out=sys.stdout
     else:
         Out=open(OutputFP,'wt')
         sys.stderr.write('\n dest file name: '+OutputFP+'\n')
                                          
-    if TgtPlaces:
-        sys.stderr.write('\nwe only do these places :'+repr(TgtPlaces)+'\n')
+#    if TgtPlaces:
+ #       sys.stderr.write('\nwe only do these places :'+repr(TgtPlaces)+'\n')
     (ckey,csecret,atoken,asecret)=get_keys(AuthkeyFile)
     auth = tweepy.OAuthHandler(ckey, csecret)
     auth.set_access_token(atoken, asecret)
 
-    twitterStream = tweepy.Stream(auth, listener(Out))
-    Locs=get_locations(GeocodeFile,TgtPlaces=TgtPlaces)
-    twitterStream.filter(locations=Locs)
+    myListener=Listener(Out)
+    myListener.stopAt=MaxTweets
+
+    twitterStream = tweepy.Stream(auth, myListener)
+    
+    twitterStream.filter(locations=Locations)
 
     if OutputFP:
         Out.close()
@@ -254,9 +335,10 @@ def get_tweets_rest(language, file_words=None, file_geocodes=None, fileout=None,
                 last_search = time()
                 
                 try:
-                    # TODO: stripping of potential ZWJ/ZWNJ on seed
                     #hits = api.search(q=seed.strip(), geocode=coords, count=100, result_type="recent")
                     hits = api.search(q=seed.strip(), geocode=coords)
+                    print('waiting...')
+                    sleep(10)
                 except tweepy.error.TweepError as e:
                     msg = "[WARNING] %s: an error occured during call to tweepy search() function : %s\n" % (os.path.basename(__file__), str(e))
                     sys.stderr.write(msg)
@@ -356,18 +438,21 @@ def main():
     ArgParser.add_argument('-l','--lang',required=True)
     ArgParser.add_argument('-g','--geocode-file',required=True)
     ArgParser.add_argument('-k','--authkey-file',required=True)
-    ArgParser.add_argument('-p','--target-places',nargs='+',type=str,default=[])
-    ArgParser.add_argument('-o','--output-fpstem',default=None)
-    #ArgParser.add_argument('--timeout',default='2h')
-    Args=ArgParser.parse_args()
+    ArgParser.add_argument('-p','--target-place_sets')
+    ArgParser.add_argument('-o','--output-dir',default='/links/corpora/twitter')
 
+    Args=ArgParser.parse_args()
+    print(Args)
+
+    LocSets=[tuple(Chunk.split(',')) for Chunk in Args.target_place_sets.replace("'",'').split('|')]
     #TOInSecs=myModule.timestr2seconds(Args.timeout)
 
     Now=datetime.now()
     NowStr=Now.strftime('%y%m%d-%H%M')
-    OutputFP=(None if not Args.output_fpstem else Args.output_fpstem+'_'+NowStr+'.json')
     
-    get_tweets_stream(Lang=Args.lang, AuthkeyFile=Args.authkey_file,GeocodeFile=Args.geocode_file,TgtPlaces=Args.target_places,OutputFP=OutputFP)
+    main0(Lang=Args.lang, AuthkeyFile=Args.authkey_file,GeocodeFile=Args.geocode_file,TgtPlaceSets=LocSets,OutputDir=Args.output_dir)
+    
+#    get_tweets_stream(Lang=Args.lang, AuthkeyFile=Args.authkey_file,GeocodeFile=Args.geocode_file,TgtPlaces=Args.target_places,OutputFP=OutputFP)
     #TimeOut=TOInSecs)
         
 if __name__ == "__main__":
