@@ -3,13 +3,36 @@ from pdb import set_trace
 import os.path,sys
 import argparse
 import tweepy
-from time import sleep, time
+import time
 from datetime import datetime
 from tweepy.models import Status
 import langid
 import json
 
 from pythonlib_ys import main as myModule
+
+
+def main0(Lang,AuthkeyFile,GeocodeFile,TgtPlaceSets,OutputDir=None,MaxTweets=1000,TimeOutInHours=12):
+    LocSets=get_locationsets(GeocodeFile,TgtPlaceSets=TgtPlaceSets)
+    StartTime=datetime.now()
+    #TimeOutInHours=20
+    while True:
+        for (TgtPlaces,LocSet) in zip(TgtPlaceSets,LocSets):
+            Now=datetime.now()
+            NowStr='-'.join([str(Now.date()),str(Now.hour),str(Now.minute)])
+            OutputFP=os.path.join(OutputDir,'-'.join(TgtPlaces)+'_'+NowStr+'.json')
+        
+            Locs=myModule.flatten_list(LocSet)
+            try:
+                get_tweets_stream(Lang,AuthkeyFile,Locs,MaxTweets=MaxTweets,OutputFP=OutputFP)
+            except Exception as e:
+                print(e)
+                sys.stderr.write('exception occurred\n')
+
+            sys.stderr.write('waiting a bit before the next round\n')
+            time.sleep(60)
+        if (datetime.now()-StartTime).seconds>TimeOutInHours*60*60:
+            break
 
 
 class Listener(tweepy.StreamListener):
@@ -69,9 +92,10 @@ class Listener(tweepy.StreamListener):
     
     def on_status(self, status):
 #        print("screen_name='%s' tweet='%s'"%(status.author.screen_name, status.text))
-        if self.debug:
-            sys.stderr.write('\n'.join([status.author.screen_name,status.text,repr(status.coordinates),repr(status.place)])+'\n\n')
         self.tweetCounter = self.tweetCounter + 1
+        if self.debug and status.place:
+            sys.stderr.write('\n'.join([str(self.tweetCounter),status.author.screen_name,status.text,repr(status.coordinates),status.place.full_name])+'\n\n')
+
  #       print(self.tweetCounter)
 
         if self.tweetCounter < self.stopAt:
@@ -136,16 +160,6 @@ def get_locations(FP,TgtPlaces=[]):
         sys.exit('\n[Error get_locations] no locations extracted\n')
                     
     return Locs
-
-def main0(Lang,AuthkeyFile,GeocodeFile,TgtPlaceSets,OutputDir=None):
-    LocSets=get_locationsets(GeocodeFile,TgtPlaceSets=TgtPlaceSets)
-    for (TgtPlaces,LocSet) in zip(TgtPlaceSets,LocSets):
-        Now=datetime.now()
-        NowStr='-'.join([str(Now.date()),str(Now.hour),str(Now.minute)])
-        OutputFP=os.path.join(OutputDir,'-'.join(TgtPlaces)+'_'+NowStr+'.json')
-        
-        Locs=myModule.flatten_list(LocSet)
-        get_tweets_stream(Lang,AuthkeyFile,Locs,MaxTweets=1000,OutputFP=OutputFP)
 
 
         
@@ -440,6 +454,8 @@ def main():
     ArgParser.add_argument('-k','--authkey-file',required=True)
     ArgParser.add_argument('-p','--target-place_sets')
     ArgParser.add_argument('-o','--output-dir',default='/links/corpora/twitter')
+    ArgParser.add_argument('-m','--max-tweets',default=1000,type=int)
+    ArgParser.add_argument('-t','--timout_inhours',default=12,type=int)
 
     Args=ArgParser.parse_args()
     print(Args)
@@ -450,7 +466,7 @@ def main():
     Now=datetime.now()
     NowStr=Now.strftime('%y%m%d-%H%M')
     
-    main0(Lang=Args.lang, AuthkeyFile=Args.authkey_file,GeocodeFile=Args.geocode_file,TgtPlaceSets=LocSets,OutputDir=Args.output_dir)
+    main0(Lang=Args.lang, AuthkeyFile=Args.authkey_file,GeocodeFile=Args.geocode_file,TgtPlaceSets=LocSets,OutputDir=Args.output_dir,MaxTweets=Args.max_tweets)
     
 #    get_tweets_stream(Lang=Args.lang, AuthkeyFile=Args.authkey_file,GeocodeFile=Args.geocode_file,TgtPlaces=Args.target_places,OutputFP=OutputFP)
     #TimeOut=TOInSecs)
