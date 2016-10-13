@@ -1,4 +1,4 @@
-import sys
+import sys,os
 from pdb import set_trace
 import os.path,sys
 import argparse
@@ -12,25 +12,37 @@ import json
 from pythonlib_ys import main as myModule
 
 
-def main0(Lang,AuthkeyFile,GeocodeFile,TgtPlaceSets,OutputDir=None,MaxTweets=1000,TimeOutInHours=12):
+def main0(Lang,AuthkeyFile,GeocodeFile,TgtPlaceSets,OutputDir=None,MaxTweets=500,TimeOutInHours=12):
     LocSets=get_locationsets(GeocodeFile,TgtPlaceSets=TgtPlaceSets)
     StartTime=datetime.now()
     #TimeOutInHours=20
+    LocSetCount=len(LocSets)
     while True:
-        for (TgtPlaces,LocSet) in zip(TgtPlaceSets,LocSets):
+        for Cntr,(TgtPlaces,LocSet) in enumerate(zip(TgtPlaceSets,LocSets)):
             Now=datetime.now()
             NowStr='-'.join([str(Now.date()),str(Now.hour),str(Now.minute)])
             OutputFP=os.path.join(OutputDir,'-'.join(TgtPlaces)+'_'+NowStr+'.json')
         
             Locs=myModule.flatten_list(LocSet)
             try:
-                get_tweets_stream(Lang,AuthkeyFile,Locs,MaxTweets=MaxTweets,OutputFP=OutputFP)
+                TmpOutputFP=OutputFP+'.tmp'
+                get_tweets_stream(Lang,AuthkeyFile,Locs,MaxTweets=MaxTweets,OutputFP=TmpOutputFP)
+                os.rename(TmpOutputFP,OutputFP)
+                
             except Exception as e:
                 print(e)
                 sys.stderr.write('exception occurred\n')
-
-            sys.stderr.write('waiting a bit before the next round\n')
-            time.sleep(60)
+                # Abnormal exit: Reconnect
+                logger.error(e)
+                nsecs = random.randint(60, 63)
+                logger.error('{0}: reconnect in {1} seconds.'.format(
+                    datetime.datetime.utcnow(), nsecs))
+                time.sleep(nsecs)
+            if (datetime.now()-StartTime).seconds>TimeOutInHours*3*60*60:
+                break
+            elif Cntr+1<LocSetCount:    
+                sys.stderr.write('waiting a bit before the next dialect set\n')
+                time.sleep(60*5)
         if (datetime.now()-StartTime).seconds>TimeOutInHours*60*60:
             break
 
@@ -454,8 +466,8 @@ def main():
     ArgParser.add_argument('-k','--authkey-file',required=True)
     ArgParser.add_argument('-p','--target-place_sets')
     ArgParser.add_argument('-o','--output-dir',default='/links/corpora/twitter')
-    ArgParser.add_argument('-m','--max-tweets',default=1000,type=int)
-    ArgParser.add_argument('-t','--timout_inhours',default=12,type=int)
+    ArgParser.add_argument('-m','--max-tweets',default=500,type=int)
+    ArgParser.add_argument('-t','--timeout-inhours',default=12,type=float)
 
     Args=ArgParser.parse_args()
     print(Args)
@@ -466,7 +478,7 @@ def main():
     Now=datetime.now()
     NowStr=Now.strftime('%y%m%d-%H%M')
     
-    main0(Lang=Args.lang, AuthkeyFile=Args.authkey_file,GeocodeFile=Args.geocode_file,TgtPlaceSets=LocSets,OutputDir=Args.output_dir,MaxTweets=Args.max_tweets)
+    main0(Lang=Args.lang, AuthkeyFile=Args.authkey_file,GeocodeFile=Args.geocode_file,TgtPlaceSets=LocSets,OutputDir=Args.output_dir,MaxTweets=Args.max_tweets,TimeOutInHours=Args.timeout_inhours)
     
 #    get_tweets_stream(Lang=Args.lang, AuthkeyFile=Args.authkey_file,GeocodeFile=Args.geocode_file,TgtPlaces=Args.target_places,OutputFP=OutputFP)
     #TimeOut=TOInSecs)
@@ -490,10 +502,6 @@ if __name__ == "__main__":
 
     # list of languages supported by langid
     LIST_OF_SUPPORTED_LANGUAGES = ['af', 'am', 'an', 'ar', 'as', 'az', 'be', 'bg', 'bn', 'br', 'bs', 'ca', 'cs', 'cy', 'da', 'de', 'dz', 'el', 'en', 'eo', 'es', 'et', 'eu', 'fa', 'fi', 'fo', 'fr', 'ga', 'gl', 'gu', 'he', 'hi', 'hr', 'ht', 'hu', 'hy', 'id', 'is', 'it', 'ja', 'jv', 'ka', 'kk', 'km', 'kn', 'ko', 'ku', 'ky', 'la', 'lb', 'lo', 'lt', 'lv', 'mg', 'mk', 'ml', 'mn', 'mr', 'ms', 'mt', 'nb', 'ne', 'nl', 'nn', 'no', 'oc', 'or', 'pa', 'pl', 'ps', 'pt', 'qu', 'ro', 'ru', 'rw', 'se', 'si', 'sk', 'sl', 'sq', 'sr', 'sv', 'sw', 'ta', 'te', 'th', 'tl', 'tr', 'ug', 'uk', 'ur', 'vi', 'vo', 'wa', 'xh', 'zh', 'zu']
-
-
     
     main()
 
-
-#    main(language=Args.lang, file_words=None, file_geocodes=Args.geocode_file, fileout=None, verbose=False)
