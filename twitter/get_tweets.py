@@ -1,4 +1,5 @@
-import sys
+import sys,os
+import logging
 from pdb import set_trace
 import os.path,sys
 import argparse
@@ -12,26 +13,38 @@ import json
 from pythonlib_ys import main as myModule
 
 
-def main0(Lang,AuthkeyFile,GeocodeFile,TgtPlaceSets,OutputDir=None,MaxTweets=1000,TimeOutInHours=12):
+def main0(Lang,AuthkeyFile,GeocodeFile,TgtPlaceSets,OutputDir=None,MaxTweets=1000,TimeOutInHours=12,Debug=False):
     LocSets=get_locationsets(GeocodeFile,TgtPlaceSets=TgtPlaceSets)
     StartTime=datetime.now()
     #TimeOutInHours=20
+    LocSetCount=len(LocSets)
+    AdjustedTO=TimeOutInHours*0.8
     while True:
-        for (TgtPlaces,LocSet) in zip(TgtPlaceSets,LocSets):
+        for Cntr,(TgtPlaces,LocSet) in enumerate(zip(TgtPlaceSets,LocSets)):
             Now=datetime.now()
             NowStr='-'.join([str(Now.date()),str(Now.hour),str(Now.minute)])
             OutputFP=os.path.join(OutputDir,'-'.join(TgtPlaces)+'_'+NowStr+'.json')
         
             Locs=myModule.flatten_list(LocSet)
             try:
-                get_tweets_stream(Lang,AuthkeyFile,Locs,MaxTweets=MaxTweets,OutputFP=OutputFP)
+                TmpOutputFP=OutputFP+'.tmp'
+                get_tweets_stream(Lang,AuthkeyFile,Locs,MaxTweets=MaxTweets,OutputFP=TmpOutputFP,Debug=Debug)
+                os.rename(TmpOutputFP,OutputFP)
+                
             except Exception as e:
                 print(e)
                 sys.stderr.write('exception occurred\n')
-
-            sys.stderr.write('waiting a bit before the next round\n')
-            time.sleep(60)
-        if (datetime.now()-StartTime).seconds>TimeOutInHours*60*60:
+                # Abnormal exit: Reconnect
+                #logger.error(e)
+                #nsecs = random.randint(60, 63)
+                #logger.error('{0}: reconnect in {1} seconds.'.format(datetime.datetime.utcnow(), nsecs))
+                #time.sleep(nsecs)
+            if (datetime.now()-StartTime).seconds>TimeOutInHours*0.8*LocSetCount*60*60:
+                break
+            elif Cntr+1<LocSetCount:    
+                sys.stderr.write('waiting a bit before the next dialect set\n')
+                time.sleep(60*5)
+        if (datetime.now()-StartTime).seconds>TimeOutInHours*1.5*(1/LocSetCount)*60*60:
             break
 
 
@@ -51,7 +64,7 @@ class Listener(tweepy.StreamListener):
         Override this method if you wish to manually handle
         the stream data. Return False to stop stream and close connection.
         """
-        self.out.write(raw_data)
+
         data = json.loads(raw_data)
 
         if 'in_reply_to_status_id' in data:
@@ -85,24 +98,30 @@ class Listener(tweepy.StreamListener):
         else:
             logging.error("Unknown message type: " + str(raw_data))
 
-  
+        #print(status.place.name)
+        if not status.coordinates and any(status.place.name==JustJ for JustJ in ['Japan','日本']):
+            pass
+        else:
+            self.out.write(raw_data)
     def on_error(self, status):
         print(status)
     
     
     def on_status(self, status):
 #        print("screen_name='%s' tweet='%s'"%(status.author.screen_name, status.text))
-        self.tweetCounter = self.tweetCounter + 1
-        if self.debug and status.place:
-            sys.stderr.write('\n'.join([str(self.tweetCounter),status.author.screen_name,status.text,repr(status.coordinates),status.place.full_name])+'\n\n')
-
- #       print(self.tweetCounter)
-
-        if self.tweetCounter < self.stopAt:
-            return True
+        if not status.coordinates and any(status.place.name==JustJ for JustJ in ['Japan','日本']):
+            if self.debug:
+                sys.stderr.write('\nIgnoring tweet just locating itself as japan\n')
         else:
-            print('maxnum = '+str(self.tweetCounter)+' reached')
-        return False
+            self.tweetCounter = self.tweetCounter + 1
+            if self.debug and status.place:
+                sys.stderr.write('\n'+'\n'.join([str(self.tweetCounter),status.text,repr(status.coordinates),status.place.full_name])+'\n')
+
+            if self.tweetCounter < self.stopAt:
+                return True
+            else:
+                print('maxnum = '+str(self.tweetCounter)+' reached')
+            return False
 
 
         
@@ -163,7 +182,7 @@ def get_locations(FP,TgtPlaces=[]):
 
 
         
-def get_tweets_stream(Lang,AuthkeyFile,Locations,MaxTweets=float('inf'),OutputFP=None,TimeOut=None):
+def get_tweets_stream(Lang,AuthkeyFile,Locations,MaxTweets=float('inf'),OutputFP=None,TimeOut=None,Debug=False):
     if not OutputFP:
         Out=sys.stdout
     else:
@@ -176,7 +195,7 @@ def get_tweets_stream(Lang,AuthkeyFile,Locations,MaxTweets=float('inf'),OutputFP
     auth = tweepy.OAuthHandler(ckey, csecret)
     auth.set_access_token(atoken, asecret)
 
-    myListener=Listener(Out)
+    myListener=Listener(Out,Debug=Debug)
     myListener.stopAt=MaxTweets
 
     twitterStream = tweepy.Stream(auth, myListener)
@@ -455,7 +474,8 @@ def main():
     ArgParser.add_argument('-p','--target-place_sets')
     ArgParser.add_argument('-o','--output-dir',default='/links/corpora/twitter')
     ArgParser.add_argument('-m','--max-tweets',default=1000,type=int)
-    ArgParser.add_argument('-t','--timout_inhours',default=12,type=int)
+    ArgParser.add_argument('-t','--timeout-inhours',default=12,type=float)
+    ArgParser.add_argument('--debug',action='store_true')
 
     Args=ArgParser.parse_args()
     print(Args)
@@ -466,7 +486,7 @@ def main():
     Now=datetime.now()
     NowStr=Now.strftime('%y%m%d-%H%M')
     
-    main0(Lang=Args.lang, AuthkeyFile=Args.authkey_file,GeocodeFile=Args.geocode_file,TgtPlaceSets=LocSets,OutputDir=Args.output_dir,MaxTweets=Args.max_tweets)
+    main0(Lang=Args.lang, AuthkeyFile=Args.authkey_file,GeocodeFile=Args.geocode_file,TgtPlaceSets=LocSets,OutputDir=Args.output_dir,MaxTweets=Args.max_tweets,TimeOutInHours=Args.timeout_inhours,Debug=Args.debug)
     
 #    get_tweets_stream(Lang=Args.lang, AuthkeyFile=Args.authkey_file,GeocodeFile=Args.geocode_file,TgtPlaces=Args.target_places,OutputFP=OutputFP)
     #TimeOut=TOInSecs)
@@ -490,10 +510,6 @@ if __name__ == "__main__":
 
     # list of languages supported by langid
     LIST_OF_SUPPORTED_LANGUAGES = ['af', 'am', 'an', 'ar', 'as', 'az', 'be', 'bg', 'bn', 'br', 'bs', 'ca', 'cs', 'cy', 'da', 'de', 'dz', 'el', 'en', 'eo', 'es', 'et', 'eu', 'fa', 'fi', 'fo', 'fr', 'ga', 'gl', 'gu', 'he', 'hi', 'hr', 'ht', 'hu', 'hy', 'id', 'is', 'it', 'ja', 'jv', 'ka', 'kk', 'km', 'kn', 'ko', 'ku', 'ky', 'la', 'lb', 'lo', 'lt', 'lv', 'mg', 'mk', 'ml', 'mn', 'mr', 'ms', 'mt', 'nb', 'ne', 'nl', 'nn', 'no', 'oc', 'or', 'pa', 'pl', 'ps', 'pt', 'qu', 'ro', 'ru', 'rw', 'se', 'si', 'sk', 'sl', 'sq', 'sr', 'sv', 'sw', 'ta', 'te', 'th', 'tl', 'tr', 'ug', 'uk', 'ur', 'vi', 'vo', 'wa', 'xh', 'zh', 'zu']
-
-
     
     main()
 
-
-#    main(language=Args.lang, file_words=None, file_geocodes=Args.geocode_file, fileout=None, verbose=False)
