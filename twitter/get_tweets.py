@@ -1,3 +1,6 @@
+#-l ja_JP -k /home/yosato/keysM.txt -g /home/yosato/myProjects/kevin_kansai/twitter/geocodes.txt -p 'Tohoku|Kanto'
+
+
 import sys,os
 import logging
 from pdb import set_trace
@@ -156,6 +159,8 @@ def get_locations(FP,TgtPlaces=[]):
     TgtPlacesL=[ TgtPlace.lower() for TgtPlace in TgtPlaces ]
     with open(FP) as FSr:
         for LiNe in FSr:
+            if LiNe.startswith('#'):
+                continue
             if LiNe.strip():
                 NameCoordStrs=LiNe.strip().split('\t')
                 CoordStrs=NameCoordStrs[1].split(',')
