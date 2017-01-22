@@ -16,13 +16,15 @@ import json
 from pythonlib_ys import main as myModule
 
 
-def main0(Lang,AuthkeyFile,GeocodeFile,TgtPlaceSets,OutputDir=None,MaxTweets=1000,TimeOutInHours=12,Debug=False):
+def main0(Lang,AuthkeyFile,GeocodeFile,TgtPlaceSets,OutputDir=None,MaxTweets=1000,TimeOutInHours=12,MaxIter=2,Debug=False):
     LocSets=get_locationsets(GeocodeFile,TgtPlaceSets=TgtPlaceSets)
     StartTime=datetime.now()
     #TimeOutInHours=20
     LocSetCount=len(LocSets)
     AdjustedTO=TimeOutInHours*0.8
+    Inter=0
     while True:
+        Iter+=1
         for Cntr,(TgtPlaces,LocSet) in enumerate(zip(TgtPlaceSets,LocSets)):
             Now=datetime.now()
             NowStr='-'.join([str(Now.date()),str(Now.hour),str(Now.minute)])
@@ -46,8 +48,8 @@ def main0(Lang,AuthkeyFile,GeocodeFile,TgtPlaceSets,OutputDir=None,MaxTweets=100
                 break
             elif Cntr+1<LocSetCount:    
                 sys.stderr.write('waiting a bit before the next dialect set\n')
-                time.sleep(60*5)
-        if (datetime.now()-StartTime).seconds>TimeOutInHours*1.5*(1/LocSetCount)*60*60:
+                time.sleep(60*3)
+        if Iter==MaxIter or (datetime.now()-StartTime).seconds>TimeOutInHours*1.5*(1/LocSetCount)*60*60:
             break
 
 
