@@ -1,20 +1,11 @@
-#-l ja_JP -k /home/yosato/keysM.txt -g /home/yosato/myProjects/kevin_kansai/twitter/geocodes.txt -p 'Tohoku|Kanto'
-
-
-import sys,os
-import logging
+import sys,os,json,logging,copy,argparse,time
 from pdb import set_trace
-import os.path,sys
-import argparse
 import tweepy
-import time
 from datetime import datetime
 from tweepy.models import Status
 import langid
-import json
 
 from pythonlib_ys import main as myModule
-
 
 def main0(Lang,AuthkeyFile,GeocodeFile,TgtPlaceSets,OutputDir=None,MaxTweets=1000,TimeOutInHours=12,MaxIter=2,Debug=False):
     LocSets=get_locationsets(GeocodeFile,TgtPlaceSets=TgtPlaceSets)
@@ -22,7 +13,7 @@ def main0(Lang,AuthkeyFile,GeocodeFile,TgtPlaceSets,OutputDir=None,MaxTweets=100
     #TimeOutInHours=20
     LocSetCount=len(LocSets)
     AdjustedTO=TimeOutInHours*0.8
-    Inter=0
+    Iter=0
     while True:
         Iter+=1
         for Cntr,(TgtPlaces,LocSet) in enumerate(zip(TgtPlaceSets,LocSets)):
@@ -139,16 +130,27 @@ def get_keys(FP):
 def geo_valid_p(Long,Lat):
     return myModule.in_range(Long,(-180,180)) and myModule.in_range(Lat,(-90,90))
 
-def coordpairs_wellformed_p(CoordPairs):
-    Cond1=len(CoordPairs)==4
-    CoordSW=CoordPairs[:2];CoordCentre=CoordPairs[2:]
-    Cond2=geo_valid_p(CoordSW[0],CoordSW[1]) and geo_valid_p(CoordCentre[0],CoordCentre[1])
-    Cond3=CoordSW[0]<CoordCentre[0] and CoordSW[1]<CoordCentre[1]
-    Conds=[Cond1,Cond2,Cond3]
-    if all(Conds):
-        return True
-    else:
+def coordpairs_wellformed_p(CoordQuads):
+    def quad_valid_p(CoordPairs):
+        CoordSW=CoordPairs[:2];CoordCentre=CoordPairs[2:]
+        Cond2=geo_valid_p(CoordSW[0],CoordSW[1]) and geo_valid_p(CoordCentre[0],CoordCentre[1])
+        Cond3=CoordSW[0]<CoordCentre[0] and CoordSW[1]<CoordCentre[1]
+        Conds=[Cond2,Cond3]
+        if all(Conds):
+            return True
+        else:
+            return False
+
+    if len(CoordQuads)%4!=0:
         return False
+    else:
+        CoordQuadsC=list(copy.copy(CoordQuads))
+        while CoordQuadsC:
+            Quad=CoordQuadsC[:4]
+            if not quad_valid_p(Quad):
+                return False
+            del CoordQuadsC[:4]
+    return True
 
 def get_locationsets(FP,TgtPlaceSets=[]):
     LocSets=[]
@@ -479,7 +481,7 @@ def main():
     ArgParser.add_argument('-g','--geocode-file',required=True)
     ArgParser.add_argument('-k','--authkey-file',required=True)
     ArgParser.add_argument('-p','--target-place_sets')
-    ArgParser.add_argument('-o','--output-dir',default='/links/corpora/twitter')
+    ArgParser.add_argument('-o','--output-dir',default='/home/yosato/')
     ArgParser.add_argument('-m','--max-tweets',default=1000,type=int)
     ArgParser.add_argument('-t','--timeout-inhours',default=12,type=float)
     ArgParser.add_argument('--debug',action='store_true')
