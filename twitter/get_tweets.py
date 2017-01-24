@@ -7,7 +7,7 @@ import langid
 
 from pythonlib_ys import main as myModule
 
-def main0(Lang,AuthkeyFile,GeocodeFile,TgtPlaceSets,OutputDir=None,MaxTweets=1000,TimeOutInHours=12,MaxIter=2,Debug=False):
+def main0(Lang,AuthkeyFile,GeocodeFile,TgtPlaceSets,OutputDir=None,MaxTweets=1000,TimeOutInHours=12,MaxIter=1,Debug=False):
     LocSets=get_locationsets(GeocodeFile,TgtPlaceSets=TgtPlaceSets)
     StartTime=datetime.now()
     #TimeOutInHours=20
@@ -481,6 +481,7 @@ def main():
     ArgParser.add_argument('-g','--geocode-file',required=True)
     ArgParser.add_argument('-k','--authkey-file',required=True)
     ArgParser.add_argument('-p','--target-place_sets')
+    ArgParser.add_argument('--max-iter',type=int,default=1)
     ArgParser.add_argument('-o','--output-dir',default='/home/yosato/')
     ArgParser.add_argument('-m','--max-tweets',default=1000,type=int)
     ArgParser.add_argument('-t','--timeout-inhours',default=12,type=float)
@@ -495,7 +496,7 @@ def main():
     Now=datetime.now()
     NowStr=Now.strftime('%y%m%d-%H%M')
     
-    main0(Lang=Args.lang, AuthkeyFile=Args.authkey_file,GeocodeFile=Args.geocode_file,TgtPlaceSets=LocSets,OutputDir=Args.output_dir,MaxTweets=Args.max_tweets,TimeOutInHours=Args.timeout_inhours,Debug=Args.debug)
+    main0(Lang=Args.lang, AuthkeyFile=Args.authkey_file,GeocodeFile=Args.geocode_file,TgtPlaceSets=LocSets,OutputDir=Args.output_dir,MaxTweets=Args.max_tweets,TimeOutInHours=Args.timeout_inhours,Debug=Args.debug,MaxIter=Args.max_iter)
     
 #    get_tweets_stream(Lang=Args.lang, AuthkeyFile=Args.authkey_file,GeocodeFile=Args.geocode_file,TgtPlaces=Args.target_places,OutputFP=OutputFP)
     #TimeOut=TOInSecs)
