@@ -23,17 +23,16 @@ def main0(JsonFP,Debug=0):
     Seen=set()
     with open(RawTxtFP) as FSr:
         for LiNe in FSr:
-            NewLines=clean_line_with_defaults(LiNe.strip(),Debug)
-    for Line in NewLines:
-        if Line in Seen:
-            sys.stderr.write('\nduplication'+Line+'\n')
-            continue
-        if len(Line)<=10:
-            sys.stderr.write('\ntoo short  '+Line+'\n\n')
-            continue
-        #sys.stderr.write('\noutput\n')
-        sys.stdout.write(Line+'\n')
-        Seen.add(Line)
+            Line=LiNe.strip()
+            if Line in Seen:
+                print('this line has already been encountered, skipping')
+            else:
+                NewLines=clean_line_with_defaults(Line,Debug)
+                Seen.add(Line)
+                if NewLines:
+                    NewLine='\n'.join(NewLines)
+                    sys.stdout.write(NewLine+'\n')
+
 
 def clean_line_with_defaults(Line,Debug=0):
     RegexesToDel=(re.compile(r'https?://[a-zA-Z0-9%_/]*'),
@@ -85,18 +84,19 @@ def clean_line(Line,RegexSets,PunctRegex,Banned,Debug):
     # these are supposed to be a sentence level
     NewLines=[]
     for Line in Lines:
+        Line=remove_nonjp_tail(Line)
         # some sents are excluded
         if to_ignore_p(Line):
             continue
 
-        Line=regex_based_cleaning(RegexSets) if not Debug else myModule.execute_warn_ifdifferent(regex_based_cleaning,(Line,RegexSets,),0,'regex based cleaning')
+        Line=regex_based_cleaning(Line,RegexSets) if not Debug else myModule.execute_warn_ifdifferent(regex_based_cleaning,(Line,RegexSets,),0,'regex based cleaning')
 
         # reduce the repetition of the same characters to one
         Line=repetition_reduction(Line) if not Debug else myModule.execute_warn_ifdifferent(repetition_reduction,(Line,),0,'repetition reduction')
 
-        Line=character_based_cleaning(Line) if not Debug else myModule.execute_warn_ifdifferent(character_based_cleaning,(Line,Banned,),0,'character based cleaning')
+        Line=character_based_cleaning(Line,Banned) if not Debug else myModule.execute_warn_ifdifferent(character_based_cleaning,(Line,Banned,),0,'character based cleaning')
 
-        NewLines.append(Line)
+        NewLines.append(Line.strip())
 
     return NewLines
 
@@ -146,7 +146,7 @@ def replace_elongation(PrvChar):
     else:
         return 'う'
 
-def delete_nonjp_tail(Str):
+def remove_nonjp_tail(Str):
     Str=Str.strip()
     TailNJCntr=0
     for Cntr,Char in enumerate(Str[::-1]):
