@@ -5,10 +5,15 @@ import clean_twitter
 imp.reload(clean_twitter)
 
 TestPairs=[
+    # case pf repetition reduction
     ('やったあああああ',['やったあ']),
-    ('はーい☀わかった',['はあい わかった']),
-    ('ははは~~〜〜〜',['はははー']),
+    # case of banned chars 
+    ('はい☀わかった',['はい わかった']),
+    # case of regex replacement
+    ('ははは~~〜〜〜',['はははあ']),
+    # case of regex deletion
     ('最新芸能今だニュース&amp;芸能ウラペディア』https://t',['最新芸能今だニュース&amp;芸能ウラペディア』']),
+    # mixture of all
 ]
 
 class TestCleanLine(unittest.TestCase):

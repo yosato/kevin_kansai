@@ -1,5 +1,5 @@
-import sys,os,re,imp,subprocess
-from  pythonlib_ys import main as myModule
+import sys,re,imp,subprocess
+from pythonlib_ys import main as myModule
 import jp_morph
 
 imp.reload(jp_morph)
@@ -10,7 +10,6 @@ def main():
     ArgPsr=argparse.ArgumentParser()
     ArgPsr.add_argument('jsonfp')
     Args=ArgPsr.parse_args()
-    
     main0(Args.jsonfp)
 
 def main0(JsonFP,Debug=0):
@@ -20,7 +19,7 @@ def main0(JsonFP,Debug=0):
     Return=Proc.wait()
     if Return!=0:
         sys.exit()
-    
+
     Seen=set()
     with open(RawTxtFP) as FSr:
         for LiNe in FSr:
@@ -41,101 +40,91 @@ def clean_line_with_defaults(Line,Debug=0):
                   re.compile(r'[@#][%_a-zA-Z0-9]+'),
                   re.compile(r'[\^_o()°;❤❤д○＼／|、…️]+$'),
                   re.compile(r'\(?[爆笑]\)?$'))
-    RegexesToRepl=[(re.compile(r'[~〜]+'),'ー')]
+    RegexesToRepl=[(re.compile(r'[~〜]+'),'ー'),
+                   (re.compile(r'ーー+'),'ー')]
     # punc -> linebreak later, inc. smileys
     #'ww+|(?^..*^)?|(?￣..*￣)?|
     PunctRegex=re.compile(r'\(..*\)|ww+|(\\n)+|[!? ！？　.♡。❤]')
-    Banned=('♪')
-    CodePointRange=(0,40959)
-    return clean_line(Line,RegexesToDel,RegexesToRepl,PunctRegex,Banned,CodePointRange,Debug)
+    BannedChars=(('♪'),
+                 ([(9728,9983),(40959,10000*10000)]))
+    return clean_line(Line,(RegexesToDel,RegexesToRepl),PunctRegex,BannedChars,Debug)
         
             
-def clean_line(Line,RegexesToDel,RegexesToRepl,PunctRegex,Banned,CodePointRange,Debug):
-    NewLines=[]
-    sys.stderr.write('\noriginal '+Line+'\n\n')
-    # delete nonjapanese tail
-    Line=delete_nonjp_tail(Line)
-    # reduction of multiple elongations
-    Line=re.sub('ーー+','ー',Line)
+def clean_line(Line,RegexSets,PunctRegex,Banned,Debug):
+    def to_ignore_p(Line):
+        DefBool=False
+        if len(Line)<=2:
+            sys.stderr.write('line too short'+Line+'\n')
+            return True
+        if not myModule.at_least_one_of_chartypes_p(Line,['hiragana','katakana']):
+            sys.stderr.write('no hiragana or katakana in this line '+Line+'\n')
+            return True
+        return DefBool
+
+    def regex_based_cleaning(Line,RegexSets):
+        (RegexesToDel,RegexesToRepl)=RegexSets
+        for RegexToDel in RegexesToDel:
+            Line=re.sub(RegexToDel,' ',Line)
+        for (RegOrg,Tgt) in RegexesToRepl:
+            Line=re.sub(RegOrg,Tgt,Line)
+        return Line
+    
+    def repetition_reduction(Line):
+        return re.sub(r'([あいうえおアイウエオ])\1{4,}',r'\1',Line)
+
     # mid-sent punctuation -> linebreak so that you get roughly a sentence a line
     Lines=[ L for L in re.split(PunctRegex,Line) if L ]
-    #                          Lines=[ L for L in re.split(r'(\\n)+|[!? ！？　.。]',Line) if L ]
 
     if Debug:
-        if len(NewLines)>=2:
+        if len(Lines)>=2:
             print('punctuation turned into linebreak')
             print(Lines)
         else:
             print('no punctuation inside the line')
 
     # these are supposed to be a sentence level
+    NewLines=[]
     for Line in Lines:
-        if not myModule.at_least_one_of_chartypes_p(Line,['hiragana','katakana']):
-            sys.stderr.write('no hiragana or katakana in this line '+Line+'\n')
+        # some sents are excluded
+        if to_ignore_p(Line):
             continue
-        NewLine=''
-        if Debug:   LineB4=Line
-        for RegexToDel in RegexesToDel:
-            Line=re.sub(RegexToDel,' ',Line)
-        if Debug:
-            print('after regexes to delete')
-            if Line==LineB4:
-                print('no change')
-            else:
-                print(Line)
-                
-        if Debug:    LineB4=Line    
-        for (RegOrg,Tgt) in RegexesToRepl:
-            Line=re.sub(RegOrg,Tgt,Line)
-        if Debug:
-            print('after regexes to replace')
-            if Line==LineB4:
-                print('no change')
-            else:
-                print(Line)
 
-        # reduce the repetition of the same characters to one    
-        if Debug:    LineB4=Line
-        Line=re.sub(r'([あいうえおアイウエオ])\1{4,}',r'\1',Line)
-        if Debug:
-            print('after repetition reduction')
-            if Line==LineB4:
-                print('no change')
-            else:
-                print(Line)
+        Line=regex_based_cleaning(RegexSets) if not Debug else myModule.execute_warn_ifdifferent(regex_based_cleaning,(Line,RegexSets,),0,'regex based cleaning')
 
-        PrvChar=''; LineLen=len(Line)
-        if Debug:    LineB4=Line
-        for CharCntr,Char in enumerate(Line):
-            CodePDec=ord(Char)
-            if CodePDec>40959 or (CodePDec>=9728 and CodePDec<=9983) or Char in Banned:
-                NewLine+=' '
-            else:
-                if CharCntr!=0 and Char=='ー':
-                    NextChar=('' if CharCntr+1==LineLen else Line[CharCntr+1])
-                    WhatToDo=delete_or_replace(PrvChar,NextChar)
-                    if WhatToDo=='replace':
-                        NewLine+=replace_elongation(PrvChar)
-                    elif WhatToDo=='donothing':
-                        NewLine+=Char
-                else:
-                    NewLine+=Char
+        # reduce the repetition of the same characters to one
+        Line=repetition_reduction(Line) if not Debug else myModule.execute_warn_ifdifferent(repetition_reduction,(Line,),0,'repetition reduction')
 
-            PrvChar=Char
+        Line=character_based_cleaning(Line) if not Debug else myModule.execute_warn_ifdifferent(character_based_cleaning,(Line,Banned,),0,'character based cleaning')
 
-        NewLine=NewLine.strip()
-        
-        if Debug:
-            print('after character-based changes')
-            if NewLine==LineB4:
-                print('no change')
-            else:
-                print(NewLine)
-
-        NewLines.append(NewLine)
+        NewLines.append(Line)
 
     return NewLines
-                
+
+def character_based_cleaning(Line,BannedChars):
+    NewLine=''
+    PrvChar=''; LineLen=len(Line)
+
+    for CharCntr,Char in enumerate(Line):
+        if Char in BannedChars[0] or myModule.in_ranges(ord(Char),BannedChars[1]):
+            NewLine+=' '
+        else:
+            if CharCntr!=0 and Char=='ー':
+                NextChar=('' if CharCntr+1==LineLen else Line[CharCntr+1])
+                WhatToDo=delete_or_replace(PrvChar,NextChar)
+                if WhatToDo=='replace':
+                    NewLine+=replace_elongation(PrvChar)
+                elif WhatToDo=='donothing':
+                    NewLine+=Char
+            else:
+                NewLine+=Char
+
+        PrvChar=Char
+
+    NewLine=NewLine.strip()
+    return NewLine
+
+
+
 def delete_or_replace(PrvChar,NextChar):
     Wds=[('で','す'), ('ま','す'), ('さ','ん'), ('ゃ','ん'), ('た','い',),('な','',),('た','',),('ね',''),('の',''),('よ','')]
     if myModule.identify_chartype(PrvChar)!='hiragana':
