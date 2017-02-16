@@ -1,6 +1,7 @@
 import sys,re,imp,subprocess
+sys.path=['../myPythonLibs_subtree']+sys.path
 from pythonlib_ys import main as myModule
-import jp_morph
+from pythonlib_ys import jp_morph
 
 imp.reload(jp_morph)
 imp.reload(myModule)
