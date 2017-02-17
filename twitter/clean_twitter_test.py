@@ -22,7 +22,7 @@ class TestCleanLine(unittest.TestCase):
 
     def test_clean_line_with_defaults(self):
         for (OrgLine,ExpNewLines) in self.testpairs:
-            set_trace()
+           # set_trace()
             ResNewLines=clean_twitter.clean_line_with_defaults(OrgLine,Debug=1)
             self.assertEqual(ResNewLines,ExpNewLines)
 
