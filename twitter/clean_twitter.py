@@ -13,8 +13,6 @@ jp_morph = imp.load_source('jp_morph', jpmorph_file)
 import myModule
 import jp_morph
 
-imp.reload(jp_morph)
-imp.reload(myModule)
 
 def main():
     import argparse
