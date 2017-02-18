@@ -3,10 +3,11 @@ import sys,re,imp,subprocess
 #from pythonlib_ys import jp_morph
 
 my_module_file = '/home/yosato/myProjects/kevin_kansai/myPythonLibs_subtree/pythonlib_ys/main.py'
-my_module_file = '/home/yosato/myProjects/kevin_kansai/myPythonLibs_subtree/pythonlib_ys/jp_morph.py'
+jpmorph_file = '/home/yosato/myProjects/kevin_kansai/myPythonLibs_subtree/pythonlib_ys/jp_morph.py'
 
 # Load the hi module using imp
 myModule = imp.load_source('myModule', my_module_file)
+jp_morph = imp.load_source('jp_morph', jpmorph_file)
 
 # Now this works, and prints hi!
 import myModule
