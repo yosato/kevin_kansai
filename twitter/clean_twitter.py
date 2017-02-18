@@ -1,7 +1,16 @@
 import sys,re,imp,subprocess
-sys.path=['../myPythonLibs_subtree']+sys.path
-from pythonlib_ys import main as myModule
-from pythonlib_ys import jp_morph
+#from pythonlib_ys import main as myModule
+#from pythonlib_ys import jp_morph
+
+my_module_file = '/home/yosato/myProjects/kevin_kansai/myPythonLibs_subtree/pythonlib_ys/main.py'
+my_module_file = '/home/yosato/myProjects/kevin_kansai/myPythonLibs_subtree/pythonlib_ys/jp_morph.py'
+
+# Load the hi module using imp
+myModule = imp.load_source('myModule', my_module_file)
+
+# Now this works, and prints hi!
+import myModule
+import jp_morph
 
 imp.reload(jp_morph)
 imp.reload(myModule)
