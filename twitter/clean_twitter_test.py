@@ -13,8 +13,13 @@ TestPairs=[
     ('ははは~~〜〜〜',['はははあ']),
     # case of regex deletion
     ('最新芸能今だニュース&amp;芸能ウラペディア』https://t',['最新芸能今だニュース&amp;芸能ウラペディア』']),
-    # mixture of all
-]
+    # remove non-character from beginning
+    ('#アキちゃん大好き',['アキちゃん大好き']),
+    # remove non-character from end
+    ('アキちゃん大好き%',['アキちゃん大好き']),
+    # replace ‼ with linebreak
+    ('なんば店‼楽しそう',['なんば店','楽しそう']),
+	]
 
 class TestCleanLine(unittest.TestCase):
     def setUp(self):
