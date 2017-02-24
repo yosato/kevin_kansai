@@ -6,13 +6,12 @@ my_module_file = '/home/yosato/myProjects/kevin_kansai/myPythonLibs_subtree/pyth
 jpmorph_file = '/home/yosato/myProjects/kevin_kansai/myPythonLibs_subtree/pythonlib_ys/jp_morph.py'
 
 # Load the hi module using imp
-myModule = imp.load_source('myModule', my_module_file)
-jp_morph = imp.load_source('jp_morph', jpmorph_file)
+myModuleMod = imp.load_source('myModule', my_module_file)
+jp_morphMod = imp.load_source('jp_morph', jpmorph_file)
 
 # Now this works, and prints hi!
 import myModule
 import jp_morph
-
 
 def main():
     import argparse
@@ -21,7 +20,7 @@ def main():
     Args=ArgPsr.parse_args()
     main0(Args.jsonfp)
 
-def main0(JsonFP,Debug=0):
+def main0(JsonFP,OutFP=None,Debug=0):
     RawTxtFP=myModule.change_ext(JsonFP,'raw.txt')
     Cmd=' '.join(['jq .text', JsonFP, '''| sed 's/^"//;s/"$//' > ''', RawTxtFP ])
     Proc=subprocess.Popen(Cmd,shell=True)
@@ -29,19 +28,45 @@ def main0(JsonFP,Debug=0):
     if Return!=0:
         sys.exit()
 
+    if not OutFP:
+        OutFP=myModule.get_stem_ext(JsonFP)[0]+'.parallel'
     Seen=set()
     with open(RawTxtFP) as FSr:
-        for LiNe in FSr:
-            Line=LiNe.strip()
-            if Line in Seen:
-                print('this line has already been encountered, skipping')
-            else:
-                NewLines=clean_line_with_defaults(Line,Debug)
-                Seen.add(Line)
-                if NewLines:
-                    NewLine='\n'.join(NewLines)
-                    sys.stdout.write(NewLine+'\n')
+        with open(OutFP,'wt') as FSw:
+            for LiNe in FSr:
+                print('\n\n'+LiNe)
+                Line=LiNe.strip()
+                if Line in Seen:
+                    print('this line has already been encountered, skipping')
+                    NewLines=[]
+                else:
+                    OldLines,NewLines=clean_line_with_defaults(Line,Debug)
+                    assert(len(OldLines)==len(NewLines))
+                    Seen.add(Line)
+                    for OldLine,NewLine in zip(OldLines,NewLines):
+                        if OldLine=='\\n':
+                            continue
+                        elif not NewLine:
+                            Comment='emptied'
+                        elif OldLine==NewLine:
+                            Comment='NO CHANGE'
+                        else:
+                            Comment='MODIFIED'
+                        FSw.write('\t'.join([Comment,OldLine,NewLine])+'\n')
+                        if NewLine:
+                            sys.stdout.write(NewLine+'\n')
 
+                        
+
+def indent_lines_with_spaces(Lines,Cnt,FstLineIndent=0):
+    NewLines=[' '*Cnt+Line for Line in Lines]
+    if FstLineIndent:
+        if FstLineIndent<0:
+            FstLine=NewLines[0].replace(' '*-FstLineIndent,'')
+        else:
+            FstLine=NewLines[0].replace('',' '*FstLineIndent)
+        NewLines[0]=FstLine
+    return '\n'.join(NewLines)
 
 def clean_line_with_defaults(Line,Debug=0):
     RegexesToDel=(re.compile(r'https?://[a-zA-Z0-9%_/]*'),
@@ -52,7 +77,7 @@ def clean_line_with_defaults(Line,Debug=0):
                    (re.compile(r'ーー+'),'ー')]
     # punc -> linebreak later, inc. smileys
     #'ww+|(?^..*^)?|(?￣..*￣)?|
-    PunctRegex=re.compile(r'\(..*\)|ww+|(\\n)+|[!? ！？　.♡。❤]')
+    PunctRegex=re.compile(r'\(..*\)|ww+|(\\n)+|[!? ！？♡。❤]')
     BannedChars=(('♪'),
                  ([(9728,9983),(40959,10000*10000)]))
     return clean_line(Line,(RegexesToDel,RegexesToRepl),PunctRegex,BannedChars,Debug)
@@ -81,7 +106,7 @@ def clean_line(Line,RegexSets,PunctRegex,Banned,Debug):
         return re.sub(r'([あいうえおアイウエオ])\1{4,}',r'\1',Line)
 
     # mid-sent punctuation -> linebreak so that you get roughly a sentence a line
-    Lines=[ L for L in re.split(PunctRegex,Line) if L ]
+    Lines=[ L.strip() for L in re.split(PunctRegex,Line) if L ]
 
     if Debug:
         if len(Lines)>=2:
@@ -96,6 +121,7 @@ def clean_line(Line,RegexSets,PunctRegex,Banned,Debug):
         Line=remove_nonjp_tail(Line)
         # some sents are excluded
         if to_ignore_p(Line):
+            NewLines.append('')
             continue
 
         Line=regex_based_cleaning(Line,RegexSets) if not Debug else myModule.execute_warn_ifdifferent(regex_based_cleaning,(Line,RegexSets,),0,'regex based cleaning')
@@ -107,7 +133,7 @@ def clean_line(Line,RegexSets,PunctRegex,Banned,Debug):
 
         NewLines.append(Line.strip())
 
-    return NewLines
+    return Lines,NewLines
 
 def character_based_cleaning(Line,BannedChars):
     NewLine=''
