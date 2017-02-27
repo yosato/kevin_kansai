@@ -47,7 +47,7 @@ def main0(JsonFP,OutFP=None,Debug=0):
                         if OldLine=='\\n':
                             continue
                         elif not NewLine:
-                            Comment='emptied'
+                            Comment='EMPTIED'
                         elif OldLine==NewLine:
                             Comment='NO CHANGE'
                         else:
