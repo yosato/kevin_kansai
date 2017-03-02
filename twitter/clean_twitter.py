@@ -34,13 +34,13 @@ def main0(JsonFP,OutFP=None,Debug=0):
     with open(RawTxtFP) as FSr:
         with open(OutFP,'wt') as FSw:
             for LiNe in FSr:
-                print('\n\n'+LiNe)
+                if Debug:   sys.stderr.write('\n\n'+LiNe+'\n')
                 Line=LiNe.strip()
                 if Line in Seen:
                     print('this line has already been encountered, skipping')
                     NewLines=[]
                 else:
-                    OldLines,NewLines=clean_line_with_defaults(Line,Debug)
+                    OldLines,NewLines=clean_line_with_defaults(Line,Debug,LogFSw=FSw)
                     assert(len(OldLines)==len(NewLines))
                     Seen.add(Line)
                     for OldLine,NewLine in zip(OldLines,NewLines):
@@ -56,41 +56,37 @@ def main0(JsonFP,OutFP=None,Debug=0):
                         if NewLine:
                             sys.stdout.write(NewLine+'\n')
 
-                        
 
-def indent_lines_with_spaces(Lines,Cnt,FstLineIndent=0):
-    NewLines=[' '*Cnt+Line for Line in Lines]
-    if FstLineIndent:
-        if FstLineIndent<0:
-            FstLine=NewLines[0].replace(' '*-FstLineIndent,'')
-        else:
-            FstLine=NewLines[0].replace('',' '*FstLineIndent)
-        NewLines[0]=FstLine
-    return '\n'.join(NewLines)
-
-def clean_line_with_defaults(Line,Debug=0):
+def clean_line_with_defaults(Line,Debug=0,LogFSw=None):
     RegexesToDel=(re.compile(r'https?://[a-zA-Z0-9%_/]*'),
                   re.compile(r'[@#][%_a-zA-Z0-9]+'),
-                  re.compile(r'[\^_o()°;❤❤д○＼／|、…️]+$'),
-                  re.compile(r'\(?[爆笑]\)?$'))
+                  re.compile(r'[\*#\^_o()°;❤❤д○\\＼／|、…️]+$'),
+                  re.compile(r'^[\*#\^_o()°;❤❤д○\\＼／|、…️]+'),
+                  re.compile(r'\(?[爆笑]\)?$'),    )
     RegexesToRepl=[(re.compile(r'[~〜]+'),'ー'),
-                   (re.compile(r'ーー+'),'ー')]
+                   (re.compile(r'ーー+'),'ー'),
+                   (re.compile(r'([でま])ーす'),r'\1す'),
+                   (re.compile(r'([あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもらりるれろわんがぎぐげござじずぜぞだぢづでどばびぶべぼぱぴぷぺぽ])ー$'),r'\1')
+                  ]
     # punc -> linebreak later, inc. smileys
     #'ww+|(?^..*^)?|(?￣..*￣)?|
     PunctRegex=re.compile(r'\(..*\)|ww+|(\\n)+|[!? ！？♡。❤]')
     BannedChars=(('♪'),
                  ([(9728,9983),(40959,10000*10000)]))
-    return clean_line(Line,(RegexesToDel,RegexesToRepl),PunctRegex,BannedChars,Debug)
+    return clean_line(Line,(RegexesToDel,RegexesToRepl),PunctRegex,BannedChars,Debug,LogFSw=LogFSw)
         
             
-def clean_line(Line,RegexSets,PunctRegex,Banned,Debug):
+def clean_line(Line,RegexSets,PunctRegex,Banned,Debug,LogFSw=None):
+    Out=sys.stderr if not LogFSw else LogFSw
     def to_ignore_p(Line):
         DefBool=False
-        if len(Line)<=2:
-            sys.stderr.write('line too short'+Line+'\n')
+        if not Line.strip():
+            return True
+        if len(Line)<=3:
+            Out.write('line too short: '+Line+'\n')
             return True
         if not myModule.at_least_one_of_chartypes_p(Line,['hiragana','katakana']):
-            sys.stderr.write('no hiragana or katakana in this line '+Line+'\n')
+            Out.write('no hiragana or katakana in this line: '+Line+'\n')
             return True
         return DefBool
 
@@ -135,6 +131,7 @@ def clean_line(Line,RegexSets,PunctRegex,Banned,Debug):
 
     return Lines,NewLines
 
+
 def character_based_cleaning(Line,BannedChars):
     NewLine=''
     PrvChar=''; LineLen=len(Line)
@@ -161,7 +158,7 @@ def character_based_cleaning(Line,BannedChars):
 
 
 def delete_or_replace(PrvChar,NextChar):
-    Wds=[('で','す'), ('ま','す'), ('さ','ん'), ('ゃ','ん'), ('た','い',),('な','',),('た','',),('ね',''),('の',''),('よ','')]
+    Wds=[('で','す'), ('ま','す'), ('さ','ん'), ('ゃ','ん'), ('た','い',)]
     if myModule.identify_chartype(PrvChar)!='hiragana':
         return 'donothing'
     else:
