@@ -17,9 +17,6 @@ except:
 Debug=0
 HomeDir=os.getenv('HOME')
 
-<<<<<<< HEAD
-def mecabline2mecabwd(MecabLine,CorpusOrDic,WithCost=False):
-=======
 DefIndsFts={0:'orth',1:'cat',2:'subcat',3:'subcat2',4:'sem',5:'infpat',6:'infform',7:'lemma',8:'reading',9:'pronunciation'}
 DefLexIndsFts={ Ind+3:Ft for (Ind,Ft) in DefIndsFts.items() }
 DefLexIndsFts.update([(0,'orth'),(1,'rightid'),(2,'rightid'),(3,'cost')])
@@ -127,12 +124,14 @@ def mecabfile2mecabsents(MecabFP):
         yield MecabSentParse(MecabWds)
     
 def mecabline2mecabwd(MecabLine,CorpusOrDic,WithCost=True):
->>>>>>> b0403c797a56fd939f5466499ab13e3540cf2437
-    Wd,FtsCosts=line2wdfts(MecabLine,CorpusOrDic,WithCost=WithCost)
+    WithCost=True if WithCost else False
+    WithCost=False if CorpusOrDic=='corpus' else WithCost
+    Wd,FtsCosts=line2wdfts(MecabLine,CorpusOrDic,WithCost)
     if WithCost:
-        Fts,Costs=FtsCosts
+        Fts,CostStrs=FtsCosts
+        Costs=[int(CostStr) for CostStr in CostStrs]
     else:
-        Fts=FtsCosts;Costs=None
+        Fts=FtsCosts[0];Costs=None
     if len(Fts)>=8:
         Cat=Fts[0]
         MecabWd=MecabWdParse(orth=Wd,cat=Cat,subcat=Fts[1],subcat2=Fts[2],sem=Fts[3],lemma=Fts[6],infpat=Fts[4],infform=Fts[5],reading=Fts[7],pronunciation=Fts[8],costs=Costs)
@@ -200,8 +199,6 @@ class MecabWdParse:
     def add_count(self,By=1):
         self.count=self.count+By
 
-<<<<<<< HEAD
-=======
     def feature_identical(self,AnotherWd,Excepts=[]):
         DefBool=True
         for Ft in self.__dict__.keys():
@@ -209,7 +206,6 @@ class MecabWdParse:
                 return not DefBool
         return DefBool
 
->>>>>>> b0403c797a56fd939f5466499ab13e3540cf2437
     def get_orthtypes(self):
         Types=[];PrvType=''
         for Char in self.orth:
@@ -219,19 +215,17 @@ class MecabWdParse:
             PrvType=CurType
         return Types
 
-<<<<<<< HEAD
-=======
     def divide_stem_suffix_radical(self):
         Irregulars=('サ変','カ変','特殊・タ')
         def determine_inftype(self):
             Pats=[ Pat for Pat in Irregulars if self.infpat.startswith(Pat)  ]
-            if Pats:
+            if self.cat=='形容詞' or (self.cat=='助動詞' and (self.infpat.startswith('形容詞') or self.infpat.startswith('特殊・ナイ') or self.infpat.startswith('特殊・タイ'))):
+                InfType='adj'
+                InfGyo=None
+            elif Pats:
                 InfType=Pats[0]
                 InfGyo=None
             
-            elif self.cat=='形容詞' or (self.cat=='助動詞' and (self.infpat.startswith('形容詞') or self.infpat.startswith('特殊・ナイ'))):
-                InfType='adj'
-                InfGyo=None
             elif self.infpat.startswith('五段'):
                 InfType='godan'
                 InfGyo=jp_morph.identify_gyo(self.infpat.split('・')[1][0],InRomaji=True)
@@ -244,11 +238,11 @@ class MecabWdParse:
             return InfType,InfGyo
         
         def handle_irregulars(self,Type):
-            Table= { 'サ変':('s',{'未然':'i','連用':'i','基本':'uる','仮定':'uれ','命令':'iろ'}),
-                     'カ変':('k',{'未然':'o','連用':'i','基本':'uる','仮定':'uれ','命令':'oい'}),
-                     '特殊・タ':('た',{'未然':'ろ','基本':'','仮定':'ら'}) }
+            Table= { 'サ変':('s',{'未然ヌ接続':'e','体言接続特殊':'ん','仮定縮約１':'ur','未然レル接続':'a','未然形':'i','未然ウ接続':'iよ','連用形':'i','基本形':'uる','仮定形':'uれ','命令ｒｏ':'iろ','命令ｙｏ':'eよ','命令ｉ':'eい'}),
+                     'カ変':('k',{'体言接続特殊':'ん','仮定縮約１':'ur','未然ウ接続':'oよ','未然形':'o','連用形':'i','基本形':'uる','仮定形':'uれ','命令ｉ':'oい'}),
+                     '特殊・タ':('た',{'未然形':'ろ','基本形':'','仮定形':'ら'}) }
             Stem,Suffixes=Table[Type]
-            Suffix=Suffixes[self.infform[:2]]
+            Suffix=Suffixes[self.infform] if Type!='サ変' else Suffixes[self.infform]
             return Stem,Suffix
            
         InfType,InfGyo=determine_inftype(self)
@@ -257,7 +251,7 @@ class MecabWdParse:
             Stem,Suffix=handle_irregulars(self,InfType)
         
         elif InfType=='adj':
-            PossibleSuffixes=('から','かろ','かっ','きゃ','く','くっ','い','けれ','ゅう','ゅぅ','う','ぅ','き','かれ')
+            PossibleSuffixes=('から','かろ','かっ','きゃ','く','くっ','い','けれ','ゅう','ゅぅ','う','ぅ','き','かれ','けりゃ')
             try:
                 Suffix=next(Suffix for Suffix in PossibleSuffixes if self.orth.endswith(Suffix) )
                 Stem=re.sub(r'%s$'%Suffix,'',self.orth)
@@ -266,6 +260,8 @@ class MecabWdParse:
                 Stem=self.orth
             
         elif InfType=='godan':
+            if self.infform.startswith('仮定縮約'):
+                self.orth=self.orth[:-1]
             Stem=self.orth[:-1]+InfGyo
             
             if self.infform=='連用タ接続':
@@ -273,19 +269,21 @@ class MecabWdParse:
                     Suffix='i'
                 elif any(InfGyo==Dan for Dan in ('t','d','r','w')):
                     Suffix='t'
-                elif any(InfGyo==Dan for Dan in ('m','n',)):
+                elif any(InfGyo==Dan for Dan in ('m','n','b',)):
                     Suffix='n'
 
             elif any(self.infform.startswith(Type) for Type in ('未然特殊','体言接続特殊')):
                 Stem=self.orth[:-1]+InfGyo
                 Suffix='n'
             elif self.infform.startswith('仮定縮約'):
-                Suffix='e'
+                Suffix='ey'
 
             else:
                 SuffixPlus=self.orth[len(Stem)-1:]
                 Suffix=jp_morph.identify_dan(SuffixPlus[0])
 #                Suffix=jp_morph.identify_dan(SuffixPlus[0])+SuffixPlus[1:]
+
+
                 
         elif InfType=='ichidan':
             Stem=self.lemma[:-1]
@@ -306,21 +304,10 @@ class MecabWdParse:
         
         return (Stem,StemReading),Suffix
     
->>>>>>> b0403c797a56fd939f5466499ab13e3540cf2437
     def divide_stem_suffix(self):
         if self.cat=='動詞':
             if self.infpat=='一段':
                 if any(Pat in self.infform for Pat in ('未然','連用','命令')):
-<<<<<<< HEAD
-                    self.stem=self.orth[:-1]
-                    self.suffix=self.orth[-1]
-                else:
-                    self.stem=self.orth[:-2]
-                    self.suffix=self.orth[-2:]
-            else:
-                self.stem=self.orth[:-1]
-                self.suffix=self.orth[-1]
-=======
                     Stem=self.orth[:-1]
                     Suffix=self.orth[-1]
                 else:
@@ -329,7 +316,6 @@ class MecabWdParse:
             else:
                 Stem=self.orth[:-1]
                 Suffix=self.orth[-1]
->>>>>>> b0403c797a56fd939f5466499ab13e3540cf2437
         elif self.cat=='形容詞':
             PossibleSuffixes=('から','かろ','かっ','きゃ','く','くっ','い','けれ','けりゃ','し')
             WhichEnding=[ Suffix for Suffix in PossibleSuffixes if self.orth.endswith(Suffix) ]
@@ -341,14 +327,6 @@ class MecabWdParse:
                     PrvChar=self.orth[BoundIndAlt]
                     if PrvChar in ('し','た','ぽ'):
                         BoundInd=BoundIndAlt
-<<<<<<< HEAD
-                self.stem=self.orth[:BoundInd]
-                self.suffix=self.orth[BoundInd:]
-            else:
-                self.stem=self.orth[:-1]
-                self.suffix=self.orth[-1:]
-            
-=======
                 Stem=self.orth[:BoundInd]
                 Suffix=self.orth[BoundInd:]
             else:
@@ -358,7 +336,6 @@ class MecabWdParse:
         self.suffix=Suffix
         return Stem,Suffix
                 
->>>>>>> b0403c797a56fd939f5466499ab13e3540cf2437
     def initialise_features_withoutlexeme(self,AVDic):
         self.construct_lexeme(AVDic)
         self.initialise_features(AVDic)
@@ -395,16 +372,10 @@ class MecabWdParse:
         else:
             self.__dict__[Ft]=Val
 
-<<<<<<< HEAD
-    def get_variant(self,Ft,Val):
-        SelfCopy=copy.deepcopy(self)
-        SelfCopy.__dict__[Ft]=Val
-=======
     def get_variant(self,FtValPairs):
         SelfCopy=copy.deepcopy(self)
         for Ft,Val in FtValPairs:
             SelfCopy.__dict__[Ft]=Val
->>>>>>> b0403c797a56fd939f5466499ab13e3540cf2437
         return SelfCopy
             
     def construct_lexeme(self,AVDic):
@@ -525,13 +496,9 @@ class MecabWdParse:
     def summary(self):
         for FtName,Val in self.__dict__.items():
             print(FtName,Val)
-<<<<<<< HEAD
-    def get_mecabline(self,):
-=======
     def get_mecabline(self,CorpusOrDic='corpus'):
         if CorpusOrDic=='dic':
             return self.get_mecabdicline()
->>>>>>> b0403c797a56fd939f5466499ab13e3540cf2437
         Str=''
         Orth=self.orth
         if Orth:
@@ -558,8 +525,9 @@ class MecabWdParse:
 
 def line2wdfts(Line,CorpusOrDic,WithCost=False):
     if CorpusOrDic=='corpus':
-        Wd,FtStr=Line.strip().split('\t')
-        Fts=tuple(FtStr.split(','))
+        WdFtStrPlusNote=Line.strip().split('\t')
+        Wd=WdFtStrPlusNote[0]
+        Fts=tuple(WdFtStrPlusNote[1].split(','))
         Costs=None
     elif CorpusOrDic=='dic':
         WdFts=Line.strip().split(',')
@@ -613,10 +581,7 @@ def cluster_samefeat_lines(FP,Colnums,Exclude=[]):
  #   if os.path.basename(FP)=='names.csv':
   #      pdb.set_trace()
     ContentsLines=OrderedDict()
-<<<<<<< HEAD
-=======
     MSs,Consts=None,myModule.prepare_progressconsts(FP)
->>>>>>> b0403c797a56fd939f5466499ab13e3540cf2437
     with open(FP,encoding='utf8',errors='replace') as FSr:
         for Cntr,LiNe in enumerate(FSr):
             if Cntr+1%500==0:
