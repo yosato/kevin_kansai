@@ -106,6 +106,25 @@ def pick_feats_fromline(Line,RelvFts,IndsFts=None,CorpusOrDic='corpus'):
             break
         Pairs.append((IndsFts[Ind],LineEls[Ind]))
     return Pairs
+
+def file2delimchunks(FP,Delim):
+    FSr=open(FP)
+    
+    Lines=[]
+    for LiNe in FSr:
+        Line=LiNe.strip()
+        if Line==Delim:
+            yield Lines
+            Lines=[]
+        else:
+            Lines.append(Line)
+
+def mecabfile2mecabsents(MecabFP):
+    #MecabWds=[]
+    ChunksG=file2delimchunks(MecabFP,'EOS')
+    for Chunk in ChunksG:
+        MecabWds=[mecabline2mecabwd(Line,'corpus') for Line in Chunk]
+        yield MecabSentParse(MecabWds)
     
 def mecabline2mecabwd(MecabLine,CorpusOrDic,WithCost=True):
 >>>>>>> b0403c797a56fd939f5466499ab13e3540cf2437
@@ -134,14 +153,29 @@ class MecabWdCluster:
     def __init__(self,MecabWdParse,CoreFtNames):
         self.wd=MecabWdParse
         self.core_fts=[ MecabWdParse ]
-        
+
+class MecabSentParse:
+    def __init__(self,MecabWds):
+        self.wds=MecabWds
+    def stringify_orths(self,WithSpace=True):
+        Str=''
+        for Wd in self.wds:
+            Str+=Wd.orth
+            if WithSpace:
+                Str+=' '
+        if WithSpace:
+            Str=Str.strip()
+        return Str
+    
 class MecabWdParse:
     def __init__(self,**AVPairs):
-
+        Fts=('orth','lemma','sem','cat','subcat','subcat2','infpat','infform','reading','pronunciation')
+        ProtoTypeFts={ Ft:'*' for Ft in Fts }
         Fts=AVPairs.keys()
         if not ('orth' in Fts or 'lemma' in Fts):
             sys.exit('you must have orth and lemma)')
         else:
+            self.__dict__=ProtoTypeFts
             for Ft,Val in AVPairs.items():
                 self.__dict__[Ft]=Val
 
@@ -149,10 +183,7 @@ class MecabWdParse:
 
         if self.cat=='動詞' or self.cat=='形容詞':
             self.divide_stem_suffix()
-#            self.lemma=AVPairs['lemma']
- #       # just populating in case 
-  #      self.subcat='*'; self.subcat2='*'; self.reading='*';self.pronunciation='*'
-   #     self.sem='*'; self.infpat='*'; self.infform='*'
+
         self.soundrules=[]; self.variants=[]
         self.count=None
         self.poss=None
@@ -162,10 +193,6 @@ class MecabWdParse:
     def set_poss(self,Poss):
         self.poss=Poss
         self.count=len(Poss)
-#        if 'lexeme' in AVPairs.keys():
- #           self.initialise_features_fromlexeme(AVPairs)
-  #      else:
-   #         self.initialise_features_withoutlexeme(AVPairs)
 
     def set_count(self,Cnt):
         self.count=Cnt
@@ -195,12 +222,41 @@ class MecabWdParse:
 <<<<<<< HEAD
 =======
     def divide_stem_suffix_radical(self):
-        InfType=None
-        if self.cat=='形容詞' or (self.cat=='助動詞' and (self.infpat.startswith('形容詞') or self.infpat.startswith('特殊・ナイ'))):
-            InfType='adj'
-        elif self.infpat.startswith('五段'):
-            InfType='godan'
-        if InfType=='adj':
+        Irregulars=('サ変','カ変','特殊・タ')
+        def determine_inftype(self):
+            Pats=[ Pat for Pat in Irregulars if self.infpat.startswith(Pat)  ]
+            if Pats:
+                InfType=Pats[0]
+                InfGyo=None
+            
+            elif self.cat=='形容詞' or (self.cat=='助動詞' and (self.infpat.startswith('形容詞') or self.infpat.startswith('特殊・ナイ'))):
+                InfType='adj'
+                InfGyo=None
+            elif self.infpat.startswith('五段'):
+                InfType='godan'
+                InfGyo=jp_morph.identify_gyo(self.infpat.split('・')[1][0],InRomaji=True)
+            elif self.infpat=='一段' or (self.cat=='助動詞' and any(self.lemma==Lemma for Lemma in ('れる','られる','せる','させる'))):
+                InfType='ichidan'
+                InfGyo=None
+            else:
+                InfType='ichidan'
+                InfGyo=None
+            return InfType,InfGyo
+        
+        def handle_irregulars(self,Type):
+            Table= { 'サ変':('s',{'未然':'i','連用':'i','基本':'uる','仮定':'uれ','命令':'iろ'}),
+                     'カ変':('k',{'未然':'o','連用':'i','基本':'uる','仮定':'uれ','命令':'oい'}),
+                     '特殊・タ':('た',{'未然':'ろ','基本':'','仮定':'ら'}) }
+            Stem,Suffixes=Table[Type]
+            Suffix=Suffixes[self.infform[:2]]
+            return Stem,Suffix
+           
+        InfType,InfGyo=determine_inftype(self)
+
+        if any(InfType==Type for Type in Irregulars):
+            Stem,Suffix=handle_irregulars(self,InfType)
+        
+        elif InfType=='adj':
             PossibleSuffixes=('から','かろ','かっ','きゃ','く','くっ','い','けれ','ゅう','ゅぅ','う','ぅ','き','かれ')
             try:
                 Suffix=next(Suffix for Suffix in PossibleSuffixes if self.orth.endswith(Suffix) )
@@ -208,28 +264,30 @@ class MecabWdParse:
             except:
                 Suffix=''
                 Stem=self.orth
-
-        elif any(self.infpat.startswith(Pat) for Pat in ('サ変','カ変')):
-            Stem=self.orth
-            Suffix=''
+            
         elif InfType=='godan':
-            if any(self.infform.startswith(Form) for Form in ('連用タ接続','未然特殊','体言接続特殊')):
-                Stem=self.orth
-                Suffix=''
+            Stem=self.orth[:-1]+InfGyo
+            
+            if self.infform=='連用タ接続':
+                if any(InfGyo==Dan for Dan in ('k', 'g')):
+                    Suffix='i'
+                elif any(InfGyo==Dan for Dan in ('t','d','r','w')):
+                    Suffix='t'
+                elif any(InfGyo==Dan for Dan in ('m','n',)):
+                    Suffix='n'
+
+            elif any(self.infform.startswith(Type) for Type in ('未然特殊','体言接続特殊')):
+                Stem=self.orth[:-1]+InfGyo
+                Suffix='n'
+            elif self.infform.startswith('仮定縮約'):
+                Suffix='e'
+
             else:
-                Stem=self.lemma[:-1]+jp_morph.identify_gyo(self.lemma[-1],InRomaji=True)
+                SuffixPlus=self.orth[len(Stem)-1:]
+                Suffix=jp_morph.identify_dan(SuffixPlus[0])
+#                Suffix=jp_morph.identify_dan(SuffixPlus[0])+SuffixPlus[1:]
                 
-                if Stem.endswith('u'):
-                    Stem=Stem[:-1]+'w'
-                if self.infform.startswith('仮定縮約'):
-                    Suffix='ya'
-                else:
-                    SuffixPlus=self.orth[len(Stem)-1:]
-                    try:
-                        Suffix=jp_morph.identify_dan(SuffixPlus[0])+SuffixPlus[1:]
-                    except:
-                        jp_morph.identify_dan(SuffixPlus[0])+SuffixPlus[1:]
-        elif self.infpat.startswith('一段'):
+        elif InfType=='ichidan':
             Stem=self.lemma[:-1]
             Suffix=self.orth[len(Stem):]
         else:

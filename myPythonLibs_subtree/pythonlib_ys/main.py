@@ -1178,6 +1178,7 @@ def in_ranges(TgtNum,Ranges):
             HexP= (type(Fst).__name__ == 'str' and type(Snd).__name__ == 'str' and 
                    len(Fst)==4 and len(Snd)==4 )
             Cond=((type(Fst).__name__ == 'int' or type(Fst).__name__ == 'float') and (type(Snd).__name__ == 'int' or type(Snd).__name__ == 'float') or HexP )
+
             if not Cond:
                 print('[myModule.in_ranges] format wrong'); exit()
         if HexP:
@@ -1787,20 +1788,22 @@ def upto_char(Str,Chars):
     return Substr
 
 
-def of_chartypes_p(Char,Types,UnivTypes=['ws']):
+def of_chartypes_p(Char,Types,UnivTypes=['ws'],Exceptions=[]):
+    if Char in Exceptions:
+        return True
     Types.extend(UnivTypes)
     CharType=identify_type_char(Char)
     return CharType in Types
 
-def all_of_types_p(Str,Types,UnivTypes=['ws']):
+def all_of_types_p(Str,Types,UnivTypes=['ws'],Exceptions=[]):
     all_of_chartypes_p(Str,Types,UnivTypes=UnivTypes)
 
-def all_of_chartypes_p(Str,Types,UnivTypes=['ws']):
+def all_of_chartypes_p(Str,Types,UnivTypes=['ws'],Exceptions=[]):
 
     Bool=True
 
     for Char in Str:
-        if not of_chartypes_p(Char,Types+UnivTypes):
+        if not of_chartypes_p(Char,Types+UnivTypes,Exceptions=Exceptions):
             Bool=False; break
     return Bool
 
