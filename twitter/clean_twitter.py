@@ -58,11 +58,13 @@ def main0(JsonFP,OutFP=None,Debug=0):
 
 
 def clean_line_with_defaults(Line,Debug=0,LogFSw=None):
+    #patterns to be removed
     RegexesToDel=(re.compile(r'https?://[a-zA-Z0-9%_/]*'),
                   re.compile(r'[@#][%_a-zA-Z0-9]+'),
                   re.compile(r'[\*#\^_o()°;❤❤д○\\＼／|、…️]+$'),
                   re.compile(r'^[\*#\^_o()°;❤❤д○\\＼／|、…️]+'),
-                  re.compile(r'\(?[爆笑]\)?$'),    )
+                  re.compile(r'\(?[爆笑]\)?$'),)
+    #patterns to be replaced
     RegexesToRepl=[(re.compile(r'[~〜]+'),'ー'),
                    (re.compile(r'ーー+'),'ー'),
                    (re.compile(r'([でま])ーす'),r'\1す'),
@@ -99,7 +101,7 @@ def clean_line(Line,RegexSets,PunctRegex,Banned,Debug,LogFSw=None):
         return Line
     
     def repetition_reduction(Line):
-        return re.sub(r'([あいうえおアイウエオ])\1{4,}',r'\1',Line)
+        return re.sub(r'([あいうえおぁぃぅぇぉアイウエオァィゥェォ])\1{3,}',r'\1',Line)
 
     # mid-sent punctuation -> linebreak so that you get roughly a sentence a line
     Lines=[ L.strip() for L in re.split(PunctRegex,Line) if L ]
