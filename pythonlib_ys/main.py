@@ -13,6 +13,49 @@ sys.path.append(os.getenv('HOME')+'/myProjects/myPythonLibs/pythonlib_ys')
 #answer = input(prompt)
 #t.cancel()
 
+def list2inddict(L):
+    return {Ind:El for (Ind,El) in enumerate(L)}
+
+
+def sort_two_files(FP1,FP2):
+    def initialise_fss(FP1,FP2):
+        FSr1=open(FP1)
+        FSr2=open(FP2)
+        Line1=FSr1.readline()
+        Line2=FSr2.readline()
+        FFS,CFS,FL=(FSr1,FSr2,Line1) if Line1>Line2 else (FSr2,FSr1,Line2)
+        FFS.seek(0); CFS.seek(0)
+        return FFS,CFS,FL
+
+    Out=sys.stdout
+    Fst=True
+    FFS=CFS=True
+    while FFS and CFS:
+        if Fst:
+            Fst=False
+            FFS,CFS,FL=initialise_fss(FP1,FP2)
+
+        else:
+            while FL==CL:
+                Out.write(CL)
+                FL=FFS.readline()
+                CL=CFS.readline()
+            
+            if FL>CL:
+                Out.write(CL)
+            else:
+                Out.write(FL)
+                FL=CL
+                CFS,FFS=FFS,CFS
+        CL=CFS.readline()    
+        
+            
+            
+#FP1='/home/yosato/Dropbox/testfiles/count_ngrams/aaa'
+#FP2='/home/yosato/Dropbox/testfiles/count_ngrams/bbb'
+
+#sort_two_files(FP1,FP2)            
+
 def ngram_lines(FP,N,OutFP=None):
     if not OutFP:
         Out=sys.stdout
@@ -539,12 +582,18 @@ def ask_filenoexist_execute_json(FP,Function,ArgsKArgs,Message='Use the old file
         open(FP,'wt').write(json.dumps(ToJson))
         return Response,True
 '''
+def looks_like_abspath(Cand):
+    if type(Cand).__name__=='str' and Cand.startswith('/'):
+        return True
+    else:
+        return False
 
-def ask_filenoexist_execute(FPs,Function,ArgsKArgs,Message='Use the old file',TO=10,DefaultReuse=True,Backup=False):
+def ask_filenoexist_execute(FPs,Function,ArgsKArgs,LoopBackArg=(1,'OutFP'),Message='Use the old file',TO=10,DefaultReuse=True,Backup=False):
     if type(FPs).__name__=='str':
         FPs=[FPs]
     FileExistP=check_exist_paths(FPs)
     RedoIt=not DefaultReuse
+    LoopBack=False
     if not FileExistP:
         RedoIt=True
     else:
@@ -552,8 +601,18 @@ def ask_filenoexist_execute(FPs,Function,ArgsKArgs,Message='Use the old file',TO
             RedoIt=False
             print('we use the processed old file')
         else:
-            RedoIt=True
             print('for this file we are redoing '+repr(Function))
+            RedoIt=True
+
+            ZeroOrOne,ArgPosOrName=LoopBackArg
+            if (ZeroOrOne<0 or ZeroOrOne>1) or (ZeroOrOne==0 and (type(ArgPosOrName).__name__!='int' or ArgPosOrName>len(ArgsKArgs[ZeroOrOne]))) or (ZeroOrOne==1 and type(ArgPosOrName).__name__!='str'):
+                LoopBack=False; sys.stderr('loopback spec not valid')
+            elif ZeroOrOne==1 and ArgPosOrName not in ArgsKArgs[ZeroOrOne].keys():
+                LoopBack=False
+            else:
+                OutFP= ArgsKArgs[ZeroOrOne][ArgPosOrName]
+                if os.path.isdir(os.path.basename(OutFP)):
+                    LoopBack=True
     
     if Backup and FileExistP and RedoIt:
         for FP in FPs:
@@ -565,7 +624,14 @@ def ask_filenoexist_execute(FPs,Function,ArgsKArgs,Message='Use the old file',TO
             sys.exit('arg arg needs to be tuple(list,dict)')
         else:
             (Args,KArgs)=ArgsKArgs
+            if LoopBack:
+                if ZeroOrOne==0:
+                    Args[ArgPosOrName]=Args[ArgPosOrName].replace(OutFP,OutFP+'.tmp')
+                elif ZeroOrOne==1:
+                    KArgs[ArgPosOrName]=KArgs[ArgPosOrName]+'.tmp'
             Return=Function(*Args,**KArgs)
+            if LoopBack:
+                os.rename(OutFP+'.tmp',OutFP)
             return Return
     return False
 
@@ -744,9 +810,17 @@ def get_endpos_fs(FS):
 #    return do_something_and_comeback_fs(FS,)
 
 
-def change_stem(FP,Addition):
+def change_stem(FP,Stuff,AddOrRemove='add'):
     StExt=get_stem_ext(FP)
-    return StExt[0]+Addition+'.'+StExt[1]
+    if AddOrRemove=='add':
+        NewFP=StExt[0]+Stuff+'.'+StExt[1]
+    elif AddOrRemove=='remove' or AddOrRemove=='delete':
+        NewFP=StExt[0].replace(Stuff,'')+'.'+StExt[1]
+    else:
+        print('\nAddOrRemove param wrong\n')
+        NewFP=None
+    return NewFP
+        
 
 def indicate_loop_progress(Var,Interval,Message='progress',Increment=1):
     if Var%Interval==0:
@@ -1130,8 +1204,8 @@ def in_ranges(TgtNum,Ranges):
             (Fst,Snd)=Range
             HexP= (type(Fst).__name__ == 'str' and type(Snd).__name__ == 'str' and 
                    len(Fst)==4 and len(Snd)==4 )
-            Cond=((type(Fst).__name__ == 'int' and type(Snd).__name__ == 'int') or
-                 HexP )
+            Cond=((type(Fst).__name__ == 'int' or type(Fst).__name__ == 'float') and (type(Snd).__name__ == 'int' or type(Snd).__name__ == 'float') or HexP )
+
             if not Cond:
                 print('[myModule.in_ranges] format wrong'); exit()
         if HexP:
@@ -1668,6 +1742,17 @@ def split_re_inclusive(Str,Delims=r'([!?\n。]+)'):
 ####
 
 
+def execute_warn_ifdifferent(Func,Args,ArgInd,Theme):
+    print(Theme)
+    Org=Args[ArgInd]
+    print('original: '+Org)
+    Out=Func(*Args)
+    if Org==Out:
+        print('no change')
+    else:
+        print('after: '+Out)
+    return Out
+
 def identify_chartype(Char):
     return identify_type_char(Char)
 
@@ -1689,6 +1774,7 @@ def identify_type_char(Char):
      }
 
     for (Type,Ranges) in TCMap.items():
+        #set_trace()
         if in_ranges(ord(Char), Ranges):
             return Type
     return 'unknown'
@@ -1719,21 +1805,32 @@ def at_least_one_of_chartypes_p(Str,Types,UnivTypes=[]):
             Bool=True; break
     return Bool
 
+def upto_char(Str,Chars):
+    Substr=''
+    for Char in Str:
+        if Char in Chars:
+            break
+        else:
+            Substr+=Char
+    return Substr
 
-def of_chartypes_p(Char,Types,UnivTypes=['ws']):
+
+def of_chartypes_p(Char,Types,UnivTypes=['ws'],Exceptions=[]):
+    if Char in Exceptions:
+        return True
     Types.extend(UnivTypes)
     CharType=identify_type_char(Char)
     return CharType in Types
 
-def all_of_types_p(Str,Types,UnivTypes=['ws']):
+def all_of_types_p(Str,Types,UnivTypes=['ws'],Exceptions=[]):
     all_of_chartypes_p(Str,Types,UnivTypes=UnivTypes)
 
-def all_of_chartypes_p(Str,Types,UnivTypes=['ws']):
+def all_of_chartypes_p(Str,Types,UnivTypes=['ws'],Exceptions=[]):
 
     Bool=True
 
     for Char in Str:
-        if not of_chartypes_p(Char,Types+UnivTypes):
+        if not of_chartypes_p(Char,Types+UnivTypes,Exceptions=Exceptions):
             Bool=False; break
     return Bool
 
