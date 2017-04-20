@@ -1,4 +1,4 @@
-import imp,re,sys,os
+import imp,re,sys,os, subprocess
 import romkan
 mecabtools=imp.load_source('mecabtools',os.path.join(os.getenv('HOME'),'myProjects/myPythonLibs/mecabtools/mecabtools.py'))
 import mecabtools
@@ -9,7 +9,7 @@ imp.reload(jp_morph)
 
 #Debug=2
 
-def main0(MecabFP,CorpusOrDic='dic',OutFP=None,Debug=0):
+def main0(MecabFP,CorpusOrDic='dic',OutFP=None,Debug=0,Fts=None):
     NewWds=set()
     if OutFP is True:
         Stem,Ext=myModule.get_stem_ext(MecabFP)
@@ -19,18 +19,64 @@ def main0(MecabFP,CorpusOrDic='dic',OutFP=None,Debug=0):
     else:
         Out=open(OutFP,'wt')
 
-    Consts=myModule.prepare_progressconsts(MecabFP)
-    MLs=None
-    FSr=open(MecabFP)
-    for Cntr,LiNe in enumerate(FSr):
-        if (Cntr+1)%1000==0:
-            MLs=myModule.progress_counter(MLs,Consts,Cntr)
-        Line=LiNe.strip()
-        if Debug>=2:  sys.stderr.write('Org line: '+LiNe)
+#    Consts=myModule.prepare_progressconsts(MecabFP)
+ #   MLs=None
+    ChunkGen=generate_chunks(MecabFP,CorpusOrDic)
+    #FSr=open(MecabFP)
+
+    for Cntr,SentChunk in enumerate(ChunkGen):
+        if Debug:
+            sys.stderr.write('\nsent '+str(Cntr+1)+' '+''.join([Sent.split('\t')[0] for Sent in SentChunk])+'\n')
+        SuccessP,NewLines=lemmatise_mecabchunk(SentChunk,CorpusOrDic,NewWds,OutFP,Debug=Debug,Fts=Fts)
+        if SuccessP:
+            Out.write('\n'.join(NewLines+['EOS'])+'\n')
+        else:
+            sys.stderr.write('\nsentence '+str(Cntr+1)+' failed\n'+repr(SentChunk)+'\non: '+repr(NewLines.__dict__)+'\n' )
+            #lemmatise_mecabchunk(SentChunk,CorpusOrDic,NewWds,OutFP,Debug=2,Fts=Fts)
+
+def sort_mecabdic_fts(MecabDicFP,Inds,OutFP):
+    if not all(os.path.exists(FP) for FP in (MecabDicFP,os.path.dirname(OutFP))):
+        sys.exit('one of the files does not exist')
+    
+    Cmd=' '.join(['cat', MecabDicFP, '| sort -k', ' '.join([str(Ind) for Ind in Inds]), '>', OutFP ])
+    Proc=subprocess.Popen(Cmd,shell=True)
+    Proc.communicate()
+            
+def generate_ftchunk(MecabDicFP,FtInds,Out=sys.stdout):
+    SortedDicFP=myModule.get_stem_ext(MecabDicFP.replace('rawData','processedData'))[0]+'.sorted.csv'
+    sort_mecabdic_fts(MecabDicFP,FtInds,OutFP=SortedDicFP)
+    FSr=open(SortedDicFP)
+    Lines=[];PrvRelvFts=None;FstLoop=True
+    for LiNe in FSr:
+        if not FstLoop:
+            Line=LiNe.strip()
+            LineEls=Line.split(',')
+            RelvFts=[LineEls[Ind] for Ind in FtInds]
+            if PrvRelvFts!=RelvFts:
+                yield Lines
+                Lines=[]
+            else:
+                Lines.append(Line)
+                PrvRelvFts=RelvFts
+        else:
+            FstLoop=not FstLoop
+
+def generate_chunks(MecabFP,CorpusOrDic):
+    if CorpusOrDic=='dic':
+        return generate_ftchunk(MecabFP,[-1])
+    elif CorpusOrDic=='corpus':
+        return mecabtools.generate_sentchunks(MecabFP)
+    else:
+        sys.exit('type must be either corpus or dic')
+        
+def lemmatise_mecabchunk(SentChunk,CorpusOrDic,NewWds,OutFP,Fts=None,Debug=0):
+    NewLines=[]
+    for Cntr,Line in enumerate(SentChunk):
+        if Debug>=2:  sys.stderr.write('Org line: '+Line+'\n')
         if CorpusOrDic=='corpus' and Line=='EOS':
             AsIs=True
         else:
-            FtsVals=mecabtools.pick_feats_fromline(Line,('cat','infpat','infform'),CorpusOrDic=CorpusOrDic)
+            FtsVals=mecabtools.pick_feats_fromline(Line,('cat','infpat','infform'),CorpusOrDic=CorpusOrDic,Fts=Fts)
             FtsValsDic=dict(FtsVals)
             #most of the time, you don't compress
             AsIs=True
@@ -38,20 +84,23 @@ def main0(MecabFP,CorpusOrDic='dic',OutFP=None,Debug=0):
                 # but if they're inflecting, you usually compress
                 AsIs=False
                 #except it is ichidan renyo and mizen
-                if FtsValsDic['infpat']=='一段' and FtsValsDic['infform'] in ('連用形','未然形'):
+                if (FtsValsDic['infpat']=='一段' and FtsValsDic['infform'] in ('連用形','未然形')) or FtsValsDic['infpat']=='不変化型' or FtsValsDic['infpat']=='特殊・ヌ':
                     AsIs=True
         if AsIs:
-            ToWrite=LiNe
+            ToWrite=[Line]
             if Debug>=2:   sys.stderr.write('no change\n')
         else:
             if Debug>=2:
-                print('\nPotentially compressable line '+str(Cntr+1)+'\n'+LiNe+'\n')
-            OrgWd=mecabtools.mecabline2mecabwd(LiNe,CorpusOrDic=CorpusOrDic,WithCost=True)
+                print('\nPotentially compressable line '+str(Cntr+1)+'\n'+Line+'\n\n')
+            OrgWd=mecabtools.mecabline2mecabwd(Line,Fts=Fts,CorpusOrDic=CorpusOrDic,WithCost=True)
             # THIS IS WHERE RENDERING HAPPENS
             try:
-                NewWd,Suffix=generate_stem_suffix_wds(OrgWd)
+                NewWd,Suffix=OrgWd.divide_stem_suffix_radical()
             except:
-                generate_stem_suffix_wds(OrgWd)
+                FailedWd=OrgWd
+                return (False,FailedWd)
+                #OrgWd.divide_stem_suffix_radical()
+
             NecEls=(NewWd.orth,NewWd.cat,NewWd.subcat,NewWd.infpat,NewWd.infform,NewWd.reading)
 
             if CorpusOrDic=='dic' and NecEls in NewWds:
@@ -59,35 +108,21 @@ def main0(MecabFP,CorpusOrDic='dic',OutFP=None,Debug=0):
                     sys.stderr.write('Not rendered, already found\n')
                 ToWrite=''
             else:
-                Line=NewWd.get_mecabline(CorpusOrDic=CorpusOrDic)
                 if Debug>=1:
                     print('Rendered, '+OrgWd.orth+' ->'+NewWd.orth+'\n')
                 if CorpusOrDic=='dic':
                     NewWds.add(NecEls)
-                    ToWrite=Line+'\n'
+                    ToWrite=[Line]
                 else:
-                    if Suffix:
-                        ToWrite=Line+'\n'+Suffix.get_mecabline(CorpusOrDic='corpus')+'\n'
-                    else:
-                        ToWrite=Line+'\n'
-                if Debug:    sys.stderr.write('rendered: '+ToWrite+'\n')
+                    ToWrite=[ Wd.get_mecabline(CorpusOrDic='corpus') for Wd in (NewWd,Suffix) if Wd.orth ]
+                if Debug:    sys.stderr.write('rendered: '+'\n'.join(ToWrite)+'\n')
 
-        Out.write(ToWrite)
+        NewLines.extend(ToWrite)
+    return (True,NewLines)
 
+        
 #SuffixDicFP='/home/yosato/links/myData/mecabStdJp/dics/compressed/suffixes.csv'
 #SuffixWds=[ mecabtools.mecabline2mecabwd(Line,CorpusOrDic='dic') for Line in open(SuffixDicFP) ]
-
-def generate_stem_suffix_wds(OrgMecabWd):
-    (Stem,StemReading),Suffix=OrgMecabWd.divide_stem_suffix_radical()
-
-    StemWd=OrgMecabWd.get_variant([('orth',Stem),('infform','語幹'),('reading',StemReading),('pronunciation',StemReading),('suffix','')])
-    if not nonstem_wd_p(OrgMecabWd):
-        StemWd.infform='語幹'
-
-    SuffixAVs={'orth':Suffix,'lemma':Suffix, 'infform':OrgMecabWd.infform, 'cat':'活用語尾', 'pronunciation':romkan.to_katakana(Suffix)}
-    SuffixWd=mecabtools.MecabWdParse(**SuffixAVs)
-
-    return StemWd,SuffixWd
 
 def nonstem_wd_p(Wd):
     DefBool=False

@@ -13,6 +13,10 @@ sys.path.append(os.getenv('HOME')+'/myProjects/myPythonLibs/pythonlib_ys')
 #answer = input(prompt)
 #t.cancel()
 
+def list2inddict(L):
+    return {Ind:El for (Ind,El) in enumerate(L)}
+
+
 def sort_two_files(FP1,FP2):
     def initialise_fss(FP1,FP2):
         FSr1=open(FP1)
@@ -578,12 +582,18 @@ def ask_filenoexist_execute_json(FP,Function,ArgsKArgs,Message='Use the old file
         open(FP,'wt').write(json.dumps(ToJson))
         return Response,True
 '''
+def looks_like_abspath(Cand):
+    if type(Cand).__name__=='str' and Cand.startswith('/'):
+        return True
+    else:
+        return False
 
-def ask_filenoexist_execute(FPs,Function,ArgsKArgs,Message='Use the old file',TO=10,DefaultReuse=True,Backup=False):
+def ask_filenoexist_execute(FPs,Function,ArgsKArgs,LoopBackArg=(1,'OutFP'),Message='Use the old file',TO=10,DefaultReuse=True,Backup=False):
     if type(FPs).__name__=='str':
         FPs=[FPs]
     FileExistP=check_exist_paths(FPs)
     RedoIt=not DefaultReuse
+    LoopBack=False
     if not FileExistP:
         RedoIt=True
     else:
@@ -591,8 +601,18 @@ def ask_filenoexist_execute(FPs,Function,ArgsKArgs,Message='Use the old file',TO
             RedoIt=False
             print('we use the processed old file')
         else:
-            RedoIt=True
             print('for this file we are redoing '+repr(Function))
+            RedoIt=True
+
+            ZeroOrOne,ArgPosOrName=LoopBackArg
+            if (ZeroOrOne<0 or ZeroOrOne>1) or (ZeroOrOne==0 and (type(ArgPosOrName).__name__!='int' or ArgPosOrName>len(ArgsKArgs[ZeroOrOne]))) or (ZeroOrOne==1 and type(ArgPosOrName).__name__!='str'):
+                LoopBack=False; sys.stderr('loopback spec not valid')
+            elif ZeroOrOne==1 and ArgPosOrName not in ArgsKArgs[ZeroOrOne].keys():
+                LoopBack=False
+            else:
+                OutFP= ArgsKArgs[ZeroOrOne][ArgPosOrName]
+                if os.path.isdir(os.path.basename(OutFP)):
+                    LoopBack=True
     
     if Backup and FileExistP and RedoIt:
         for FP in FPs:
@@ -604,7 +624,14 @@ def ask_filenoexist_execute(FPs,Function,ArgsKArgs,Message='Use the old file',TO
             sys.exit('arg arg needs to be tuple(list,dict)')
         else:
             (Args,KArgs)=ArgsKArgs
+            if LoopBack:
+                if ZeroOrOne==0:
+                    Args[ArgPosOrName]=Args[ArgPosOrName].replace(OutFP,OutFP+'.tmp')
+                elif ZeroOrOne==1:
+                    KArgs[ArgPosOrName]=KArgs[ArgPosOrName]+'.tmp'
             Return=Function(*Args,**KArgs)
+            if LoopBack:
+                os.rename(OutFP+'.tmp',OutFP)
             return Return
     return False
 
@@ -1178,6 +1205,7 @@ def in_ranges(TgtNum,Ranges):
             HexP= (type(Fst).__name__ == 'str' and type(Snd).__name__ == 'str' and 
                    len(Fst)==4 and len(Snd)==4 )
             Cond=((type(Fst).__name__ == 'int' or type(Fst).__name__ == 'float') and (type(Snd).__name__ == 'int' or type(Snd).__name__ == 'float') or HexP )
+
             if not Cond:
                 print('[myModule.in_ranges] format wrong'); exit()
         if HexP:
@@ -1787,20 +1815,22 @@ def upto_char(Str,Chars):
     return Substr
 
 
-def of_chartypes_p(Char,Types,UnivTypes=['ws']):
+def of_chartypes_p(Char,Types,UnivTypes=['ws'],Exceptions=[]):
+    if Char in Exceptions:
+        return True
     Types.extend(UnivTypes)
     CharType=identify_type_char(Char)
     return CharType in Types
 
-def all_of_types_p(Str,Types,UnivTypes=['ws']):
+def all_of_types_p(Str,Types,UnivTypes=['ws'],Exceptions=[]):
     all_of_chartypes_p(Str,Types,UnivTypes=UnivTypes)
 
-def all_of_chartypes_p(Str,Types,UnivTypes=['ws']):
+def all_of_chartypes_p(Str,Types,UnivTypes=['ws'],Exceptions=[]):
 
     Bool=True
 
     for Char in Str:
-        if not of_chartypes_p(Char,Types+UnivTypes):
+        if not of_chartypes_p(Char,Types+UnivTypes,Exceptions=Exceptions):
             Bool=False; break
     return Bool
 

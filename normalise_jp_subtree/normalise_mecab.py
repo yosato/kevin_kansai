@@ -17,19 +17,24 @@ imp.reload(mecabtools)
 from probability import probability
 imp.reload(probability)
 
-def main0(LexFPs,MecabCorpusFPs,CorpusOnly=False,FreqWdFP=None,UnnormalisableMarkP=True,ProbExemplarFP=None,OutFP=None,Debug=0):
+def main0(LexFPs,MecabCorpusFPs,CorpusOnly=False,FreqWdFP=None,UnnormalisableMarkP=True,ProbExemplarFP=None,OutFP=None,Fts=None,Debug=0):
+    for FP in (FreqWdFP,ProbExemplarFP):
+        if FP is not None and not os.path.isfile(FreqWdFP):
+            sys.exit(FP+' does not exist\n')
+            
     LexDir=os.path.dirname(LexFPs[0])
     RelvFts=('cat','subcat','subcat2','sem','infform','infpat','pronunciation')
     ProbExemplars=get_exemplars(ProbExemplarFP) if ProbExemplarFP else None
     Frequents=collect_freq_wds(FreqWdFP,1000) if FreqWdFP else set()
     OutFPStem=LexDir+'/'+'--'.join([os.path.basename(LexFP) for LexFP in LexFPs])
+    OutFPStem=OutFPStem.replace('rawData','processedData')
     HClusters,_=myModule.ask_filenoexist_execute_pickle(OutFPStem+'.pickle',get_clustered_homs,([LexFPs,RelvFts],{'Frequents':Frequents,'ProbExemplars':ProbExemplars,'Debug':Debug}))
     if Debug:
         print_clustered_homs(HClusters,OutFP=os.path.join(LexDir,'exemplarless_clusters.txt'),Debug=Debug)
     LexFPs=[] if CorpusOnly else LexFPs
     for MecabFile,CorpusOrDic in [(LexFP,'dic') for LexFP in LexFPs]+[(MecabCorpusFP,'corpus') for MecabCorpusFP in MecabCorpusFPs]:
         sys.stderr.write('\n\nNormalising a '+CorpusOrDic+' '+MecabFile+'\n')
-        time.sleep(2)
+        #time.sleep(2)
         FN=os.path.basename(MecabFile)
         NewFN=myModule.change_stem(FN,'.normed')
         NewDir=os.path.join(os.path.dirname(MecabFile),'normed')
@@ -39,8 +44,10 @@ def main0(LexFPs,MecabCorpusFPs,CorpusOnly=False,FreqWdFP=None,UnnormalisableMar
             OutFP=OutFP
         else:
             OutFP=os.path.join(NewDir,NewFN)
-        normalise_mecabfile(MecabFile,RelvFts,HClusters,OutFP=OutFP+'.tmp',CorpusOrDic=CorpusOrDic,UnnormalisableMarkP=UnnormalisableMarkP,Debug=Debug)
-        os.rename(OutFP+'.tmp',OutFP)
+        OutFP=OutFP+'.tmp'
+            
+        normalise_mecabfile(MecabFile,RelvFts,HClusters,Fts=Fts,OutFP=OutFP,CorpusOrDic=CorpusOrDic,UnnormalisableMarkP=UnnormalisableMarkP,Debug=Debug)
+        os.rename(OutFP,re.sub(r'\.tmp$','',OutFP))
 
 
 def print_clustered_homs(ClusteredHs,OutFP=None,Debug=0):
@@ -71,7 +78,7 @@ def upto_char(Str,Chars):
             Substr+=Char
     return Substr
 
-def normalise_mecabfile(FP,RelvFts,ClusteredHs,OutFP=None,RelvFtCnt=7,CorpusOrDic='corpus',Format='corpus',KanaOnly=True,UnnormalisableMarkP=True,Debug=0):
+def normalise_mecabfile(FP,RelvFts,ClusteredHs,OutFP=None,RelvFtCnt=7,CorpusOrDic='corpus',Format='corpus',KanaOnly=True,UnnormalisableMarkP=True,Fts=None,Debug=0):
     # outfp could be none, true or string
     if not OutFP:
         Out=sys.stdout
@@ -103,7 +110,7 @@ def normalise_mecabfile(FP,RelvFts,ClusteredHs,OutFP=None,RelvFtCnt=7,CorpusOrDi
             AsItIs=True
         else:
             CommonFtsVals={}
-            Tuple=tuple(mecabtools.pick_feats_fromline(LiNe,RelvFts,CorpusOrDic=CorpusOrDic))
+            Tuple=tuple(mecabtools.pick_feats_fromline(LiNe,RelvFts,Fts=Fts,CorpusOrDic=CorpusOrDic))
             CommonFtsVals.update(Tuple)
             # excluding symbols and unknowns
             if CorpusOrDic=='corpus' and (CommonFtsVals['cat'] in ExclCats or len(CommonFtsVals)<RelvFtCnt):
@@ -173,8 +180,12 @@ def get_clustered_homs_file(LexFP,RelvFts,Frequents=set(),ProbExemplars={},OutFP
         if MWd.cat!='名詞' and not any(MWd.lemma in Frequents for MWd in MWds):
             continue
         #FtSetLabeled=list(zip(RelvFts,FtSet))
-        if Debug:    sys.stderr.write(' '.join([MWd.orth for MWd in MWds])+'\n')
-        myCHs=ClusteredHomonyms(MWds,RelvFts,ExemplarDict=ProbExemplars)
+        if (Debug==1 and Cntr%50==0) or Debug>=2 :
+            sys.stderr.write(' '.join([MWd.orth for MWd in MWds])+'\n')
+        try:
+            myCHs=ClusteredHomonyms(MWds,RelvFts,ExemplarDict=ProbExemplars)
+        except:
+            ClusteredHomonyms(MWds,RelvFts,ExemplarDict=ProbExemplars)
         ClusteredHs.append(myCHs)
     return ClusteredHs
 
