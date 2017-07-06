@@ -1,5 +1,8 @@
+#/usr/bin/env python3
+
 import imp,sys,os,subprocess,glob,shutil,re
-import compress_inflecting, normalise_mecab, mecabtools
+from mecabtools import mecabtools
+import compress_inflecting, normalise_mecab
 from pythonlib_ys import main as myModule
 imp.reload(compress_inflecting)
 imp.reload(normalise_mecab)
@@ -10,17 +13,23 @@ def insert_el(El,List,Pos):
     return BinarySplits[0]+[El]+BinarySplits[1]
 
 def refresh_model(DicDir,ConfDir,ModelDir):
+    #if not all(os.path.isfile(os.path.join(DicDir,DicFN)) for DicFN in ('non-inflecting.csv','inflecting.csv')):
+        
     list(map(os.remove, glob.glob(ModelDir+'/*')))
     list(map(lambda x:shutil.copy(x,ModelDir), glob.glob(DicDir+'/*.csv')))
     list(map(lambda x:shutil.copy(x,ModelDir), glob.glob(ConfDir+'/*')))
     Cmd=' '.join(['mecab-dict-index -d',ModelDir,'-o',ModelDir])
     subprocess.call(Cmd,shell=True)
 
-def main0(StdJpTxtFP,OrgDicLoc,ModelDir=None,DicSkip=True,ExemplarFP=None,FreqWdFP=None,ExtraIndsFts={},Debug=0):
+def main0(StdJpTxtFP,OrgDicLoc,ModelDir=None,DicSkip=True,ExemplarFP=None,FreqWdFP=None,ExtraIndsFts={},Debug=0,CompressOnly=False):
     Fts=mecabtools.DefFts
     for (Ind,Ft) in ExtraIndsFts:
         Fts=insert_el(Ft,Fts,Ind+1)
-    
+
+    DicFPs=glob.glob(os.path.join(OrgDicLoc,'*.csv'))
+    if not DicFPs:
+        sys.exit('dics not found in the specified dir')
+        
     if not any(StdJpTxtFP.endswith(Ext) for Ext in ('.txt','mecab')):
         sys.exit('input filename has to have the extension of either .txt or .mecab (and has to be text or mecab respectively)')
     elif 'rawData' not in StdJpTxtFP:
@@ -33,44 +42,66 @@ def main0(StdJpTxtFP,OrgDicLoc,ModelDir=None,DicSkip=True,ExemplarFP=None,FreqWd
         CmpMecabFN=re.sub(r'(.txt|.mecab)','.compressed.mecab',os.path.basename(StdJpTxtFP))
         TextOrMecab='text' if StdJpTxtFP.endswith('.txt') else 'mecab'
 
+    print('\nCompression + normalisation wrapper to be applied to '+StdJpTxtFP+'\n')
+        
     #################################
     ## compression on dic and corpus
     #################################
     ### dic first ###
-    InfCats=('adjectives','verbs','auxiliaries')
-    DicFPsInf=[os.path.join(OrgDicLoc,Cat+'.csv') for Cat in InfCats ]
+    InfCats=('adj','verb','aux','infl')
+    DicFPsInf=[ FP for FP in DicFPs if any(Cat in os.path.basename(FP).lower() for Cat in InfCats) ]
+    assert(DicFPsInf), 'no inflecting cat dic found, beware the naming convention, should containt "adj", "verb", "aux", "infl"'
     NewDicLoc=OrgDicLoc.replace('rawData','processedData')
-    CmpDicFPs=[os.path.join(NewDicLoc,Cat+'.compressed.csv') for Cat in InfCats ]
+    if not os.path.isdir(NewDicLoc):
+        os.makedirs(NewDicLoc)
+    CmpDicFPs=[ myModule.change_ext(os.path.join(NewDicLoc,os.path.basename(OrgDicFP)),'compressed.csv') for OrgDicFP in DicFPsInf ]
+    DicFPNonInf=os.path.join(OrgDicLoc,'non-inflecting.csv')
+
     if DicSkip:
         FreshlyDoneP=False
+        LexFPs=[DicFPNonInf]+DicFPsInf
     else:
-    # original dics to compress, inflecting categories only
+        # original dics to compress, inflecting categories only
         for (DicFPInf,CmpDicFP) in zip(DicFPsInf,CmpDicFPs):
             Ret=myModule.ask_filenoexist_execute(CmpDicFPs,compress_inflecting.main0,([DicFPInf],{'CorpusOrDic':'dic','OutFP':CmpDicFP,'Debug':Debug}))
         FreshlyDoneP=True if Ret is None else False
+        LexFPs=[DicFPNonInf]+CmpDicFPs
 
     # then the corpora
     CmpMecabFP=os.path.join(CmpMecabDir, CmpMecabFN)
     ModelDir=CmpMecabDir+'/models' if ModelDir is None else ModelDir
     if not os.path.isdir(ModelDir):
         os.makedirs(ModelDir)
-    if not os.path.isfile(os.path.join(ModelDir,'dicrc')) or myModule.prompt_loop_bool('Refreshing the model?'):
+    if not os.path.isfile(os.path.join(ModelDir,'dicrc')) or myModule.prompt_loop_bool('Refreshing the model?',TO=5):
         ConfLoc=os.path.join(os.path.dirname(OrgDicLoc),'models')
         refresh_model(OrgDicLoc,ConfLoc,ModelDir)
     
-    FreshlyDoneP=myModule.ask_filenoexist_execute(CmpMecabFP,build_compressed_corpus,([StdJpTxtFP,ModelDir,CmpMecabFP],{'Fts':Fts,'TextOrMecab':TextOrMecab,'Debug':Debug}),LoopBackArg=(0,2),DefaultReuse=not FreshlyDoneP)
+    FreshlyDoneP=myModule.ask_filenoexist_execute(CmpMecabFP,build_compressed_corpus,([StdJpTxtFP,ModelDir,CmpMecabFP],{'Fts':Fts,'TextOrMecab':TextOrMecab,'Debug':Debug}),LoopBackArg=(0,2),DefaultReuse=False)
+
+    if CompressOnly:
+        print('compression only option chosen, exiting')
+        sys.exit()
+        
     ###################################
     ## normalisation of the corpus
     ##################################    
     # for normalisation you include non-inflecting dic as well
-    DicFPNonInf=os.path.join(OrgDicLoc,'non-inflecting.csv')
     FinalMecabFP=myModule.change_stem(CmpMecabFP,'.normed')
     # an exemplar is a word with a single dominant normalisation case
-    ExemplarFP=os.path.join(OrgDicLoc,'exemplars.txt') if not ExemplarFP else ExemplarFP
+    if not ExemplarFP:
+        DefExemplarFP=os.path.join(OrgDicLoc,'exemplars.txt')
+        if os.path.isfile(DefExemplarFP):
+            ExemplarFP=DefExemplarFP
+        else:
+            sys.stderr.write('\nExemplar file is not found in the dic dir\n')
+            ExemplarFP=None
+    else:
+        ExemplarFP=ExemplarFP
     # one could limit the targets to frequent words only
     FreqWdFP='/links/rawData/mecabStdJp/corpora/freqwds.txt' if not FreqWdFP else FreqWdFP
     # core part
-    normalise_mecab.main0([DicFPNonInf]+CmpDicFPs,[CmpMecabFP],ProbExemplarFP=ExemplarFP,FreqWdFP=FreqWdFP,OutFP=FinalMecabFP,Fts=Fts,CorpusOnly=True,UnnormalisableMarkP=True,Debug=Debug)
+    print('\nNow moving on to normalisation')
+    normalise_mecab.main0(LexFPs,[CmpMecabFP],ProbExemplarFP=ExemplarFP,FreqWdFP=FreqWdFP,OutFP=FinalMecabFP,Fts=Fts,CorpusOnly=True,UnnormalisableMarkP=True,Debug=Debug)
     print('file outputted to '+FinalMecabFP)
 
 
@@ -134,6 +165,7 @@ def main():
     ArgPsr.add_argument('raw_fp')
     ArgPsr.add_argument('dic_loc')
     ArgPsr.add_argument('--modeldir')
+    ArgPsr.add_argument('--compress-only',action='store_true')
     ArgPsr.add_argument('--exemplar-fp','-e')
     ArgPsr.add_argument('--freqwd-fp','-f')
     ArgPsr.add_argument('--extra-indsfts',nargs='+')
@@ -141,7 +173,7 @@ def main():
     Args=ArgPsr.parse_args()
 
     if not os.path.isfile(Args.raw_fp):
-        sys.exit('\n\n  source file not found \n')
+        sys.exit('\n\n  corpus source file '+Args.raw_fp+' not found \n')
     if Args.extra_indsfts:
         if len(Args.extra_indsfts)%2!=0:
             sys.exit('extra-indsfts option must consist of even num of args')
@@ -156,13 +188,14 @@ def main():
         ExtraIndsFts=list(zip(Evens,Odds))
         #if any(type(Key).__name__!='int' for Key in ExtraIndsFts.keys()):
          #   sys.exit('extra-indsfts option odd num args must be integer')
-        
+    else:
+        ExtraIndsFts=[]
 
     if (Args.exemplar_fp is not None and not os.path.isfile(Args.exemplar_fp)) or (Args.freqwd_fp is not None and not os.path.isfile(Args.freqwd_fp)):
         sys.exit('\n\n one of the assisting files for normalisations (exemplar, freqwd) not found\n')
         
     
-    main0(Args.raw_fp,Args.dic_loc,ModelDir=Args.modeldir,ExemplarFP=Args.exemplar_fp,FreqWdFP=Args.freqwd_fp,ExtraIndsFts=ExtraIndsFts,Debug=Args.debug)
+    main0(Args.raw_fp,Args.dic_loc,ModelDir=Args.modeldir,ExemplarFP=Args.exemplar_fp,FreqWdFP=Args.freqwd_fp,ExtraIndsFts=ExtraIndsFts,Debug=Args.debug,CompressOnly=Args.compress_only)
 
 if __name__=='__main__':
     main()
