@@ -1,10 +1,9 @@
 import re, imp, os, sys, time, shutil,subprocess,collections, copy
 from difflib import SequenceMatcher
-sys.path.append('./../myPythonLibs')
 from collections import defaultdict,OrderedDict
 from pythonlib_ys import main as myModule
 import romkan
-import jp_morph
+from pythonlib_ys import jp_morph
 imp.reload(myModule)
 imp.reload(jp_morph)
 try:
@@ -211,18 +210,26 @@ class MecabWdParse:
         return Types
 
     def divide_stem_suffix_radical(self,OutputObject=True,StrictP=False):
-        IrregTable= { 'サ変':('s',{'未然ヌ接続':'e','体言接続特殊':'ん','仮定縮約１':'ur','未然レル接続':'a','未然形':'i','未然ウ接続':'iよ','連用形':'i','基本形':'uる','仮定形':'uれ','命令ｒｏ':'iろ','命令ｙｏ':'eよ','命令ｉ':'eい'}),
-                    'カ変':('k',{'体言接続特殊':'ん','仮定縮約１':'ur','未然ウ接続':'oよ','未然形':'o','連用形':'i','基本形':'uる','仮定形':'uれ','命令ｉ':'oい'}),
-                    '特殊・タ':('た',{'未然形':'ろ','連用タ接続':'t','基本形':'','仮定形':'ら'}),
-                      '特殊・ヤ':('や',{'未然形':'ろ','連用タ接続':'t','基本形':'','体言接続':'な','仮定形':'ら'}),
-                      '特殊・ダ':('だ',{'未然形':'ろ','連用タ接続':'t','連用形':'で','基本形':'','仮定形':'ら','体言接続':'な'}),
-                      '特殊・マス':('まs',{'連用形':'i','未然ウ接続':'iy','未然形':'e','基本形':'u'}),
-                      '特殊・デス':('でs',{'連用形':'i','未然ウ接続':'iy','基本形':'u'})
+        IrregTable= {
+            'サ変':('s',{'未然ヌ接続':'e','体言接続特殊':'ん','仮定縮約１':'ur','未然レル接続':'a','未然形':'i','未然ウ接続':'iよ','連用形':'i','基本形':'uる','仮定形':'uれ','命令ｒｏ':'iろ','命令ｙｏ':'eよ','命令ｉ':'eい','未然形・長音化':'eえ','未然形・長音化i':'iい','基本形・撥音便':'uん','未然形・ヤ挿入':'iや'}),
+            'カ変':('k',{'体言接続特殊':'ん','仮定縮約１':'ur','未然ウ接続':'oよ','未然形':'o','連用形':'i','基本形':'uる','仮定形':'uれ','命令ｉ':'oい','基本形・撥音便':'uん','未然形・長音化':'eえ','未然形・長音化o':'oお','未然形・長音化i':'iい','未然形・ヤ挿入':'iや'}),
+            '特殊・タ':('た',{'未然形':'ろ','連用タ接続':'t','基本形':'','仮定形':'ら'}),
+            '特殊・ヤ':('や',{'未然形':'ろ','連用タ接続':'t','基本形':'','体言接続':'な','仮定形':'ら'}),
+            '特殊・ダ':('だ',{'未然形':'ろ','連用タ接続':'t','連用形':'で','基本形':'','仮定形':'ら','体言接続':'な'}),
+                        '特殊・ジャ':('だ',{'未然形':'ろ','連用タ接続':'t','連用形':'で','基本形':'','仮定形':'ら','体言接続':'な'}),
+            '特殊・マス':('まs',{'連用形':'i','未然ウ接続':'iy','未然形':'e','基本形':'u','基本形・撥音便':'n'}),
+            '特殊・デス':('でs',{'連用形':'i','未然ウ接続':'iy','未然形':'iy','基本形':'u','基本形・撥音便':'n'}),
+            '五段・特殊':('ちゃw',{'基本形':'u','連用形':'uく','未然形':'a','連用タ接続':'uかっ'})
             }
         Irregulars=set(IrregTable.keys())
         def determine_inftype(self):
             Pats=[ Pat for Pat in Irregulars if self.infpat.startswith(Pat) ]
-            if self.cat=='形容詞' or (self.cat=='助動詞' and (self.infpat.startswith('形容詞') or self.infpat.startswith('特殊・ナイ') or self.infpat.startswith('特殊・タイ'))):
+
+            if self.infpat == '特殊・タんや' or self.infpat == '特殊・タ＋んや' or self.infpat == '文語・ベシ':
+                InfType='fixed'
+                InfGyo=None
+
+            elif self.cat=='形容詞' or (self.cat=='助動詞' and (self.infpat.startswith('形容詞') or self.infpat.startswith('特殊・ナイ') or self.infpat.startswith('特殊・タイ'))):
                 InfType='adj'
                 InfGyo=None
             elif Pats:
@@ -234,9 +241,6 @@ class MecabWdParse:
                 InfGyo=jp_morph.identify_gyo(self.infpat.split('・')[1][0],InRomaji=True)
             elif self.infpat.startswith('一段') or (self.cat=='助動詞' and any(self.lemma==Lemma for Lemma in ('れる','られる','せる','させる'))):
                 InfType='ichidan'
-                InfGyo=None
-            elif self.infpat == '特殊・タんや':
-                InfType='fixed'
                 InfGyo=None
             else:
                 InfType=None
@@ -285,7 +289,7 @@ class MecabWdParse:
                 elif any(InfGyo==Dan for Dan in ('m','n','b',)):
                     Suffix='n'
 
-            elif any(self.infform.startswith(Type) for Type in ('未然特殊','体言接続特殊','基本形・撥音便・縮約形')):
+            elif any(self.infform.startswith(Type) for Type in ('未然特殊','体言接続特殊','基本形・撥音便')):
                 Stem=self.orth[:-1]+InfGyo
                 Suffix='n'
             elif self.infform.startswith('仮定縮約'):
