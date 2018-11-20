@@ -1,4 +1,4 @@
-import sys,re,imp,subprocess
+import sys,re,imp,subprocess,os
 #from pythonlib_ys import main as myModule
 #from pythonlib_ys import jp_morph
 
@@ -13,12 +13,6 @@ jp_morphMod = imp.load_source('jp_morph', jpmorph_file)
 import myModule
 import jp_morph
 
-def main():
-    import argparse
-    ArgPsr=argparse.ArgumentParser()
-    ArgPsr.add_argument('jsonfp')
-    Args=ArgPsr.parse_args()
-    main0(Args.jsonfp)
 
 def main0(JsonFP,OutFP=None,Debug=0):
     RawTxtFP=myModule.change_ext(JsonFP,'raw.txt')
@@ -193,7 +187,22 @@ def remove_nonjp_tail(Str):
     else:
         return Str[:-TailNJCntr]
     
+def main():
+    import argparse,glob
+    ArgPsr=argparse.ArgumentParser()
+    ArgPsr.add_argument('dirname')
+    Args=ArgPsr.parse_args()
+
+    if not os.path.isdir(Args.dirname):
+        sys.exit('what you put is not a dirname')
+    
+    JsonFPs=glob.glob(os.path.join(Args.dirname,'*.json'))
+
+    if not JsonFPs:
+        sys.exit('json ext file not found in '+Args.dirname)
+    
+    for JsonFP in JsonFPs:
+        main0(JsonFP)
                 
 if __name__=='__main__':
-    FP=sys.argv[1]
     main()
