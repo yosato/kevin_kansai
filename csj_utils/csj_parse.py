@@ -1,21 +1,34 @@
 from xml.etree import ElementTree as ET
-import os,sys,json
+import os,sys
 from collections import defaultdict
 
-def main0(XmlFP,OutputFP):
+def main0(XmlFP,OutFP):
+    SentsLUWs=get_luws(XmlFP)
+    WantedFt='PlainOrthographicTranscription'
+    with open(OutFP,'wt') as FSw:
+        for LUWs in SentsLUWs.values():
+            for LUW in LUWs:
+                if 'LUWPOS' in LUW.attrib.keys() and LUW.attrib['LUWPOS']=='名詞':
+                    SUWs=LUW.getchildren()
+                    if len(SUWs)>1:
+                        SUWsStr=' '.join([SUW.attrib[WantedFt] for SUW in SUWs])
+                        sys.stdout.write(SUWsStr)
+
+def get_luws(XmlFP):
     '''
-    this returns the dict with sentence IDs as its keys and their corresponding LUWs as its values
+    this is the main func, which returns the dict with sentence IDs as its keys and their corresponding LUWs as its values
     An LUW is an 'Element' object of ElementTree API of Python standard lib, and contains SUWs as its children, so that's all you'd need.
     Refer to https://docs.python.org/3/library/xml.etree.elementtree.html for details of this object
     '''
     ETree=ET.parse(XmlFP)
-    FndEls=defaultdict(list)
-    with open(OutputFP,'wt') as FSw:
-        InitNode=ETree.getroot()
-        Nodes=find_nodes_in_tree(InitNode,[],TgtNodes=['LUW'],ParentToo=True)
-        for (HitLUW,Parent) in Nodes:
-            SentID=int(Parent.attrib['IPUID'])
-            FndEls[SentID].append(HitLUW)
+    FndLUWs=defaultdict(list)
+    InitNode=ETree.getroot()
+    Nodes=find_nodes_in_tree(InitNode,[],TgtNodes=['LUW'],ParentToo=True)
+    for (HitLUW,Parent) in Nodes:
+        SentID=int(Parent.attrib['IPUID'])
+        FndLUWs[SentID].append(HitLUW)
+
+    return FndLUWs    
 
 
 def find_nodes_in_tree(ParentNode,ResNodes,TgtNodes='all',ParentToo=True):
