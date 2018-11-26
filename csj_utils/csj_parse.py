@@ -2,17 +2,18 @@ from xml.etree import ElementTree as ET
 import os,sys
 from collections import defaultdict
 
-def main0(XmlFP,OutFP):
+def main0(XmlFP,OutFP=None):
     SentsLUWs=get_luws(XmlFP)
     WantedFt='PlainOrthographicTranscription'
-    with open(OutFP,'wt') as FSw:
-        for LUWs in SentsLUWs.values():
-            for LUW in LUWs:
-                if 'LUWPOS' in LUW.attrib.keys() and LUW.attrib['LUWPOS']=='名詞':
-                    SUWs=LUW.getchildren()
-                    if len(SUWs)>1:
-                        SUWsStr=' '.join([SUW.attrib[WantedFt] for SUW in SUWs])
-                        sys.stdout.write(SUWsStr)
+    Out=sys.stdout if OutFP is None else open(OutFP,'wt')
+    for LUWs in SentsLUWs.values():
+        for LUW in LUWs:
+            if 'LUWPOS' in LUW.attrib.keys() and LUW.attrib['LUWPOS']=='名詞':
+                SUWs=[Child for Child in LUW.getchildren() if Child.tag=='SUW']
+                SUWsStr=' '.join([SUW.attrib[WantedFt] for SUW in SUWs])
+                sys.stdout.write(SUWsStr+'\n')
+    if OutFP:
+        Out.close()
 
 def get_luws(XmlFP):
     '''
@@ -57,8 +58,6 @@ def main():
     Args=Psr.parse_args()
     if not Args.input_fp.endswith('.xml'):
         sys.exit('input file must end with xml extension')
-    if Args.output_fp is None:
-        Args.output_fp=(''.join(Args.input_fp.split('.')[:-1]+['.parse']))
     main0(Args.input_fp,Args.output_fp)
 
 
