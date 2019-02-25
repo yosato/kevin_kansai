@@ -26,7 +26,7 @@ def get_suws(LUW):
     return [Child.attrib['SUW'] for Child in LUW.get_children()]
 def get_next_suwfeats(LUW,FtNames):
     Fts=get_repeated_list(None,len(FtNames))
-    for SUW in LUW.get_suws(LUW):
+    for SUW in get_suws(LUW):
         for (Ind,FtName) in enumerate(FtNames):
             if FtName in SUW.attrib.keys() and Fts[Ind] is None:
                 Fts[Ind]=SUW.attrib[FtName]
@@ -45,20 +45,20 @@ def generate_grouped_luws(XmlFP,Unit='Sentence'):
     InitNode=ETree.getroot()
     FndLUWs=OrderedDict()
     LUWsPerUnit=[];PrvUnitID=0
-    for LUW in generate_nodes(InitNode,'LUW'):
-        CurUnitID,CurModID=get_next_suwfeats(LUW,['Dep_BunsetsuUnitID','Dep_ModifieeBunsetsuUnitID'])
-        if CurUnitID is not None:
-            if CurUnitID<PrvUnitID:
-                yield FndLUWs
-        else:
-            FndLUWs.append(LUW)
+    for IPU in generate_nodes(InitNode,'IPU'):
+        for LUW in generate_nodes(IPU,'LUW'):
+            CurUnitID,CurModID=get_next_suwfeats(LUW,['Dep_BunsetsuUnitID','Dep_ModifieeBunsetsuUnitID'])
+            if CurUnitID is not None:
+                if CurUnitID<PrvUnitID:
+                    yield FndLUWs
+            else:
+                FndLUWs.append(LUW)
 
 def generate_nodes(ParentNode,NodeName):
     for ChildNode in ParentNode:
         if ChildNode.tag==NodeName:
             yield ChildNode
-        else:
-            generate_nodes(ChildNode,NodeName)
+
 
 def find_nodes_in_tree(ParentNode,ResNodes,TgtNodes='all',ParentToo=True):
     assert TgtNodes=='all' or (isinstance(TgtNodes,list) and len(TgtNodes)==len(set(TgtNodes)))
