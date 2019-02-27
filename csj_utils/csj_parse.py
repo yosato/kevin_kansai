@@ -44,19 +44,21 @@ def generate_grouped_luws(XmlFP,Unit='Sentence'):
     FndLUWs=[]
     InitNode=ETree.getroot()
     FndLUWs=OrderedDict()
-    LUWsPerUnit=[];PrvMderID=float('inf')
+    LUWsPerUnit=[];PrvMderID=-float('inf')
     for IPUChild in generate_nodes(InitNode,'IPU'):
         if IPUChild.tag=='LUW':
             LUW=IPUChild
-            MderIDOrNone,MdedIDOrNone=[int(Ft) if Ft is not None else None for Ft in get_next_suwfeats(LUW,['Dep_BunsetsuUnitID','Dep_ModifieeBunsetsuUnitID'])]
+            MderID,MdedID=[int(Ft) if Ft is not None else None for Ft in get_next_suwfeats(LUW,['Dep_BunsetsuUnitID','Dep_ModifieeBunsetsuUnitID'])]
 
             if MderID is not None:
                 if MderID<PrvMderID:
                     yield FndLUWs
-                    
                 else:
-                    PrvMderID=MderID
                     FndLUWs.append(LUW)
+                    
+            else:
+                PrvMderID=MderID
+                FndLUWs.append(LUW)
 
 
 def generate_nodes(ParentNode,NodeName):
