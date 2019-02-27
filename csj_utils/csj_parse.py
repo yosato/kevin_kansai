@@ -43,28 +43,29 @@ def generate_grouped_luws(XmlFP,Unit='Sentence'):
     ETree=ET.parse(XmlFP)
     FndLUWs=[]
     InitNode=ETree.getroot()
-    FndLUWs=OrderedDict()
+    FndLUWs=[]
     LUWsPerUnit=[];PrvMderID=-float('inf')
-    for IPUChild in generate_nodes(InitNode,'IPU'):
-        if IPUChild.tag=='LUW':
-            LUW=IPUChild
+    for IPU in return_immediate_targetnodes(InitNode,'IPU'):
+        for LUW in return_immediate_targetnodes(IPU,'LUW'): 
             MderID,MdedID=[int(Ft) if Ft is not None else None for Ft in get_next_suwfeats(LUW,['Dep_BunsetsuUnitID','Dep_ModifieeBunsetsuUnitID'])]
 
             if MderID is not None:
                 if MderID<PrvMderID:
                     yield FndLUWs
                 else:
+                    PrvMderID=MderID
                     FndLUWs.append(LUW)
                     
             else:
-                PrvMderID=MderID
                 FndLUWs.append(LUW)
 
 
-def generate_nodes(ParentNode,NodeName):
+def return_immediate_targetnodes(ParentNode,TgtNodeName):
+    Nodes=[]
     for ChildNode in ParentNode:
-        if ChildNode.tag==NodeName:
-            return ChildNode
+        if ChildNode.tag==TgtNodeName:
+            Nodes.append(ChildNode)
+    return Nodes
 
 
 def find_nodes_in_tree(ParentNode,ResNodes,TgtNodes='all',ParentToo=True):
