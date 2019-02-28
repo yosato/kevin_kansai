@@ -4,18 +4,59 @@ from collections import defaultdict,OrderedDict
 
 def main0(XmlFP,WantedFts=[]):
     for LUWsPerUnit in generate_grouped_luws(XmlFP):
+        print_orths_from_luws(LUWsPerUnit)
+        extract_dep_chain_from_luws(LUWsPerUnit)
         for LUW in LUWsPerUnit:
             SUWs=get_suws(LUW)
-            SUWsStr=' '.join([(SUW.attrib['Dep_BunsetsuUnitID'] if 'Dep_BunsetsuUnitID' in SUW.attrib.keys() else '')+' '+SUW.attrib['PlainOrthographicTranscription'] for SUW in SUWs])
-            if WantedFts:
-                FtsStr='\t'
-                for (Ind,SUW) in enumerate(SUWs):
-                    for WantedFt in WantedFts:
-                        FtsStr+=' '+WantedFt+':'+SUW.attrib[WantedFt] if WantedFt in SUW.attrib.keys() else ''
-            #if 'LUWPOS' in LUW.attrib.keys() and LUW.attrib['LUWPOS']=='名詞':
-            sys.stdout.write(SUWsStr+FtsStr+'\n')
-    #if OutFP:
-     #   Out.close()
+def print_orths_from_luws(LUWs):
+    for LUW in LUWs:
+        for SUW in get_suws(LUW):
+            print(SUW.attrib['OrthographicTranscription'])
+
+def pairs2chains(Pairs):
+    Chains=[]
+    
+        
+def find_connections(Pairs):
+    while True:
+        OrgPair=Pairs[0]
+        TgtPairs=Pairs[1:]
+        NxtConnections=find_next_connections(OrgPair,TgtPairs)
+        if NxtConnections:
+            find_connections(NxtConnections)
+        else:
+            break
+        
+
+def find_next_connections(OrgPair,TgtPairs):
+    return [Pair for Pair in TgtPairs if Pair[0]==OrgPair[1]]
+    
+
+
+def extract_dep_chain_from_luws(LUWsPerSent):
+    MderIDs=[];MdedIDs=[]
+    for LUWCntr,LUW in enumerate(LUWsPerSent):
+        MderID,MdedID=[(Ind,int(Ft)) if Ft is not None else None for Ind,Ft in get_next_suwfeats_withinds(LUW,['Dep_BunsetsuUnitID','Dep_ModifieeBunsetsuUnitID'])]
+        if MderID:
+            MderIDs.append(((LUWCntr,)+(MderID[0],),MderID[1]))
+        if MdedID:
+            MdedIDs.append(((LUWCntr,)+(MdedID[0],),MdedID[1]))
+    print(MdedIDs)
+    print(MderIDs)
+    Binaries=[]
+    for (MdedPoss,MdedID) in MdedIDs:
+        MderPoss=next(MderID[0] for MderID in MderIDs if MderID[1]==MdedID)
+        Binaries.append((MdedPoss,MderPoss,))
+    return pairs2chains(Pairs)
+    
+
+def get_next_suwfeats_withinds(LUW,FtNames):
+    Fts=get_repeated_list((None,None),len(FtNames))
+    for Cntr,SUW in enumerate(get_suws(LUW)):
+        for (Ind,FtName) in enumerate(FtNames):
+            if FtName in SUW.attrib.keys() and Fts[Ind] is (None,None):
+                Fts[Ind]=(Cntr,SUW.attrib[FtName])
+    return Fts
 
 def get_repeated_list(El,Times):
     L=[]
