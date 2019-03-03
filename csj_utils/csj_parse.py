@@ -1,21 +1,45 @@
 from xml.etree import ElementTree as ET
-import os,sys
+import os,sys,imp
 from collections import defaultdict,OrderedDict
+from pythonlib_ys import main as myModule
+
+imp.reload(myModule)
 
 def main0(XmlFP,WantedFts=[]):
-    for LUWsPerUnit in generate_grouped_luws(XmlFP):
-        print_orths_from_luws(LUWsPerUnit)
-        extract_dep_chain_from_luws(LUWsPerUnit)
-        for LUW in LUWsPerUnit:
-            SUWs=get_suws(LUW)
-def print_orths_from_luws(LUWs):
+    ComplexNominals=[]
+    for LUWsPerSent in generate_grouped_luws(XmlFP,Unit='Sentence'):
+        print_orths_from_luws(LUWsPerSent)
+        ChainsLUW=get_dependency_chains(LUWsPerSent)
+        for Chain in ChainsLUW:
+            print_orths_from_luws(Chain)
+            HitInds=[]
+            for Ind,LUW in enumerate(Chain):
+                SUW=get_suws(LUW)[0]
+                POS=SUW.attrib['SUWPOS']
+                if POS in ['名詞','代名詞']:
+                    HitInds.append(Ind)
+            if HitInds:
+                LstNounInd=HitInds[-1]
+                if LstNounInd>0:
+                    for LUW in Chain:
+                        print(get_suws(LUW)[0].attrib)
+                    ComplexNominals.append(Chain[:LstNounInd+1])
+        
+
+def get_dependency_chains(LUWsPerSent):
+    ChainsNum=extract_dep_chain_from_luws(LUWsPerSent)
+    ChainsLUW=[]
+    for ChainNum in ChainsNum:
+        ChainsLUW.append([LUWsPerSent[Ind] for Ind in ChainNum])
+    return ChainsLUW        
+
+def print_orths_from_luws(LUWs,Delim=' '):
     for LUW in LUWs:
         for SUW in get_suws(LUW):
-            print(SUW.attrib['OrthographicTranscription'])
+            sys.stderr.write(SUW.attrib['OrthographicTranscription']+Delim)
+        sys.stderr.write(Delim)
+    sys.stderr.write('\n')
 
-def pairs2chains(Pairs):
-    Chains=[]
-    
         
 def find_connections(Pairs):
     while True:
@@ -41,14 +65,28 @@ def extract_dep_chain_from_luws(LUWsPerSent):
             MderIDs.append(((LUWCntr,)+(MderID[0],),MderID[1]))
         if MdedID:
             MdedIDs.append(((LUWCntr,)+(MdedID[0],),MdedID[1]))
-    print(MdedIDs)
-    print(MderIDs)
+ #   print(MdedIDs)
+  #  print(MderIDs)
+    if not MdedIDs:
+        return []
     Binaries=[]
     for (MdedPoss,MdedID) in MdedIDs:
         MderPoss=next(MderID[0] for MderID in MderIDs if MderID[1]==MdedID)
         Binaries.append((MdedPoss,MderPoss,))
-    return pairs2chains(Pairs)
-    
+    Binaries=[(Poss[0][0],Poss[1][0]) for Poss in Binaries]
+    Chains=myModule.Tree(Binaries).create_paths(NoInitTerms=True)
+    FlatChains=[]
+    for Chain in Chains:
+        if len(Chain)==1:
+            FlatChain=Chain[0]
+        else:
+            FlatChain=[]
+            for Node in Chain:
+                FlatChain.append(Node[0])
+            FlatChain.append(Chain[-1][-1])
+            FlatChain=tuple(FlatChain)
+        FlatChains.append(FlatChain)
+    return FlatChains
 
 def get_next_suwfeats_withinds(LUW,FtNames):
     Fts=get_repeated_list((None,None),len(FtNames))
@@ -64,7 +102,7 @@ def get_repeated_list(El,Times):
         L.append(El)
     return L
 def get_suws(LUW):
-    return [Child for Child in LUW if Child.tag]
+    return [Child for Child in LUW if Child.tag=='SUW']
 def get_next_suwfeats(LUW,FtNames):
     Fts=get_repeated_list(None,len(FtNames))
     for SUW in get_suws(LUW):
@@ -93,6 +131,7 @@ def generate_grouped_luws(XmlFP,Unit='Sentence'):
             if MderID is not None:
                 if MderID<PrvMderID:
                     yield FndLUWs
+                    FndLUWs=[];PrvMderID=-float('inf')
                 else:
                     PrvMderID=MderID
                     FndLUWs.append(LUW)
