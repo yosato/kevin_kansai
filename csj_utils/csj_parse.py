@@ -19,7 +19,7 @@ def main0(XmlFP,WantedFts=[],Debug=False):
         for Chains in NominalLUWChains.values():
             if len(Chains)>=2:
                 MaxChain=sorted(Chains,key=lambda x:len(x),reverse=True)[0]
-                print_orths_from_luws([LUW[1] for LUW in Chain])
+                print_orths_from_luws([LUW[1] for LUW in MaxChain])
                 sys.stdout.write('(')
                 for Chain in Chains:
                  
