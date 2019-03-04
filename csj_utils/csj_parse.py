@@ -5,52 +5,80 @@ from pythonlib_ys import main as myModule
 
 imp.reload(myModule)
 
-def main0(XmlFP,WantedFts=[]):
+def main0(XmlFP,WantedFts=[],Debug=False):
     ComplexNominals=[]
     for LUWsPerSent in generate_grouped_luws(XmlFP,Unit='Sentence'):
         print_orths_from_luws(LUWsPerSent)
+        sys.stdout.write('--------------------\n')
         ChainsLUW=get_dependency_chains(LUWsPerSent)
-        for Chain in ChainsLUW:
-            print_orths_from_luws(Chain)
-            HitInds=[]
-            for Ind,LUW in enumerate(Chain):
-                SUW=get_suws(LUW)[0]
-                POS=SUW.attrib['SUWPOS']
-                if POS in ['名詞','代名詞']:
-                    HitInds.append(Ind)
-            if HitInds:
-                LstNounInd=HitInds[-1]
-                if LstNounInd>0:
+        if Debug:
+            for Chain in ChainsLUW:
+                print_orths_from_luws(Chain)
+        NominalLUWChains=get_complex_nominals(ChainsLUW)
+        NominalLUWChains=group_chains(NominalLUWChains)
+        for Chains in NominalLUWChains.values():
+            if len(Chains)>=2:
+                MaxChain=sorted(Chains,key=lambda x:len(x),reverse=True)[0]
+                print_orths_from_luws([LUW[1] for LUW in Chain])
+                sys.stdout.write('(')
+                for Chain in Chains:
+                 
+                    print_orths_from_luws([LUW[1] for LUW in Chain],Delim=' ')
+                sys.stdout.write(')\n')
+            else:
+                Chain=Chains[0]
+                print_orths_from_luws([LUW[1] for LUW in Chain])
+
+        ComplexNominals.append(NominalLUWChains)
+        sys.stdout.write('========================\n')
+
+def group_chains(Chains):
+    NewChains=defaultdict(list)
+    for Chain in Chains:
+        TailInd=Chain[-1][0]
+        NewChains[TailInd].append(Chain)
+        
+    return NewChains
+
+def get_complex_nominals(ChainsLUW,Debug=False):
+    ComplexNominals=[]
+    for Chain in ChainsLUW:
+        HitInds=[]
+        for Cntr,(Ind,LUW) in enumerate(Chain):
+            #SUW=get_suws(LUW)[0]
+            POS=LUW.attrib['LUWPOS']
+            if POS in ['名詞','代名詞']:
+                HitInds.append(Cntr)
+        if HitInds:
+            LstNounInd=HitInds[-1]
+            if LstNounInd>0:
+                if Debug:
                     for LUW in Chain:
                         print(get_suws(LUW)[0].attrib)
-                    ComplexNominals.append(Chain[:LstNounInd+1])
-        
+                ComplexNominals.append(Chain[:LstNounInd+1])
+    return ComplexNominals    
+
+def print_orth_from_luw(LUW,Delim=' '):
+    Strs=[]
+    for SUW in get_suws(LUW):
+        Strs.append(SUW.attrib['OrthographicTranscription'])
+    sys.stdout.write(Delim.join(Strs)+Delim*3)
+
+
+def print_orths_from_luws(LUWs,Delim='\n'):
+    for Cntr,LUW in enumerate(LUWs):
+        print_orth_from_luw(LUW)
+    sys.stdout.write(Delim)
+
+def get_suws(LUW):
+    return [Child for Child in LUW if Child.tag=='SUW']
 
 def get_dependency_chains(LUWsPerSent):
     ChainsNum=extract_dep_chain_from_luws(LUWsPerSent)
     ChainsLUW=[]
     for ChainNum in ChainsNum:
-        ChainsLUW.append([LUWsPerSent[Ind] for Ind in ChainNum])
+        ChainsLUW.append([(Ind,LUWsPerSent[Ind]) for Ind in ChainNum])
     return ChainsLUW        
-
-def print_orths_from_luws(LUWs,Delim=' '):
-    for LUW in LUWs:
-        for SUW in get_suws(LUW):
-            sys.stderr.write(SUW.attrib['OrthographicTranscription']+Delim)
-        sys.stderr.write(Delim)
-    sys.stderr.write('\n')
-
-        
-def find_connections(Pairs):
-    while True:
-        OrgPair=Pairs[0]
-        TgtPairs=Pairs[1:]
-        NxtConnections=find_next_connections(OrgPair,TgtPairs)
-        if NxtConnections:
-            find_connections(NxtConnections)
-        else:
-            break
-        
 
 def find_next_connections(OrgPair,TgtPairs):
     return [Pair for Pair in TgtPairs if Pair[0]==OrgPair[1]]
@@ -101,8 +129,7 @@ def get_repeated_list(El,Times):
     for i in range(Times):
         L.append(El)
     return L
-def get_suws(LUW):
-    return [Child for Child in LUW if Child.tag=='SUW']
+
 def get_next_suwfeats(LUW,FtNames):
     Fts=get_repeated_list(None,len(FtNames))
     for SUW in get_suws(LUW):
