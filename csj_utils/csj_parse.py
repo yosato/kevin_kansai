@@ -6,7 +6,7 @@ from pythonlib_ys import main as myModule
 imp.reload(myModule)
 
 def main0(XmlFP,WantedFts=[],Debug=False):
-    ComplexNominals=[]
+    ComplexNominalsClassified={'relcl':[],'pp':[],'compl':[]}
     for LUWsPerSent in generate_grouped_luws(XmlFP,Unit='Sentence'):
         print_orths_from_luws(LUWsPerSent)
         sys.stdout.write('--------------------\n')
@@ -15,24 +15,33 @@ def main0(XmlFP,WantedFts=[],Debug=False):
             for Chain in ChainsLUW:
                 print_orths_from_luws(Chain)
         NominalLUWChains=get_complex_nominals(ChainsLUW)
-        NominalLUWChains=group_chains(NominalLUWChains)
-        for Chains in NominalLUWChains.values():
+        LenGroupedNominalLUWChains=lengthgroup_chains(NominalLUWChains)
+        for Chains in LenGroupedNominalLUWChains.values():
             if len(Chains)>=2:
-                MaxChain=sorted(Chains,key=lambda x:len(x),reverse=True)[0]
-                print_orths_from_luws([LUW[1] for LUW in MaxChain])
-                sys.stdout.write('(')
-                for Chain in Chains:
-                 
-                    print_orths_from_luws([LUW[1] for LUW in Chain],Delim=' ')
-                sys.stdout.write(')\n')
+                LengthSortedChains=sorted(Chains,key=lambda x:len(x),reverse=True)
             else:
-                Chain=Chains[0]
-                print_orths_from_luws([LUW[1] for LUW in Chain])
+                LengthSortedChains=Chains
+            ChosenChain=LengthSortedChains[0]
+            Class=classify_chain(ChosenChain)
+            sys.stdout.write(Class+'\t')
+            print_orths_from_luws([stuff[1] for stuff in ChosenChain])
+            ComplexNominalsClassified[Class]=ChosenChain
 
-        ComplexNominals.append(NominalLUWChains)
         sys.stdout.write('========================\n')
 
-def group_chains(Chains):
+def classify_chain(Chain):
+    PenulPOS=Chain[-2][1].attrib['LUWPOS']
+    if PenulPOS=='動詞':
+        Class='relcl'
+    elif PenulPOS=='名詞' or PenulPOS=='代名詞':
+        Class='pp'
+    elif PenulPOS=='形容詞':
+        Class='adj'
+    else:
+        Class='compl'
+    return Class
+
+def lengthgroup_chains(Chains):
     NewChains=defaultdict(list)
     for Chain in Chains:
         TailInd=Chain[-1][0]
@@ -45,8 +54,10 @@ def get_complex_nominals(ChainsLUW,Debug=False):
     for Chain in ChainsLUW:
         HitInds=[]
         for Cntr,(Ind,LUW) in enumerate(Chain):
-            #SUW=get_suws(LUW)[0]
-            POS=LUW.attrib['LUWPOS']
+            if 'LUWPOS' not in LUW.attrib.keys():
+                return []
+            else:
+                POS=LUW.attrib['LUWPOS']
             if POS in ['名詞','代名詞']:
                 HitInds.append(Cntr)
         if HitInds:
