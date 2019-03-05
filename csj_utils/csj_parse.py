@@ -1,15 +1,36 @@
 from xml.etree import ElementTree as ET
-import os,sys,imp
+import os,sys,imp,glob
 from collections import defaultdict,OrderedDict
+sys.path.append('/home/yosato/myProjects/myPythonLibs')
 from pythonlib_ys import main as myModule
 
 imp.reload(myModule)
 
-def main0(XmlFP,WantedFts=[],Debug=False):
-    ComplexNominalsClassified={'relcl':[],'pp':[],'compl':[]}
+def main0(InFPs,Debug=False):
+    Stats={'adj':[0,0],'others':[0,0],'pp':[0,0],'relcl':[0,0]}
+    FailedFPs=[]
+    
+    for XmlFP in InFPs:
+        try:
+            CompNomsPerFile=count_complex_nominals(XmlFP,Debug=Debug)
+        except:
+            FailedFPs.append(XmlFP)
+        for (Type,Chains) in CompNomsPerFile.items():
+            Stats[Type][0]+=len(Chains)
+            WdCnt=sum(len(Chain) for Chain in Chains)
+            Stats[Type][1]+=WdCnt
+    print(Glob+', '+str(len(InFPs))+' files')
+    for Type,Cnts in Stats.items():
+        sys.stdout.write(Type+': '+str(Cnts[0])+' '+str(Cnts[1])+'\n')
+        
+            
+
+def count_complex_nominals(XmlFP,Debug=False):
+    ComplexNominalsClassified={'relcl':[],'pp':[],'adj':[],'others':[]}
     for LUWsPerSent in generate_grouped_luws(XmlFP,Unit='Sentence'):
-        print_orths_from_luws(LUWsPerSent)
-        sys.stdout.write('--------------------\n')
+        if Debug:
+            print_orths_from_luws(LUWsPerSent)
+            sys.stdout.write('--------------------\n')
         ChainsLUW=get_dependency_chains(LUWsPerSent)
         if Debug:
             for Chain in ChainsLUW:
@@ -23,11 +44,14 @@ def main0(XmlFP,WantedFts=[],Debug=False):
                 LengthSortedChains=Chains
             ChosenChain=LengthSortedChains[0]
             Class=classify_chain(ChosenChain)
-            sys.stdout.write(Class+'\t')
-            print_orths_from_luws([stuff[1] for stuff in ChosenChain])
-            ComplexNominalsClassified[Class]=ChosenChain
+            if Debug:
+                sys.stdout.write(Class+'\t')
+                print_orths_from_luws([stuff[1] for stuff in ChosenChain])
+            ComplexNominalsClassified[Class].append(ChosenChain)
 
-        sys.stdout.write('========================\n')
+        if Debug:
+            sys.stdout.write('========================\n')
+    return ComplexNominalsClassified
 
 def classify_chain(Chain):
     PenulPOS=Chain[-2][1].attrib['LUWPOS']
@@ -35,10 +59,10 @@ def classify_chain(Chain):
         Class='relcl'
     elif PenulPOS=='名詞' or PenulPOS=='代名詞':
         Class='pp'
-    elif PenulPOS=='形容詞':
+    elif PenulPOS=='形容詞' or PenulPOS=='連体詞':
         Class='adj'
     else:
-        Class='compl'
+        Class='others'
     return Class
 
 def lengthgroup_chains(Chains):
@@ -206,14 +230,13 @@ def find_nodes_in_tree(ParentNode,ResNodes,TgtNodes='all',ParentToo=True):
 def main():
     import argparse
     Psr=argparse.ArgumentParser()
-    Psr.add_argument('input_fp')
+    Psr.add_argument('input_glob',type=str)
     Psr.add_argument('--output-fp')
     Psr.add_argument('--wanted-fts',nargs='+')
 
     Args=Psr.parse_args()
-    if not Args.input_fp.endswith('.xml'):
-        sys.exit('input file must end with xml extension')
-    main0(Args.input_fp,WantedFts=Args.wanted_fts)
+    
+    main0(Args.input_glob.strip("'"))
 
 
 if __name__ == '__main__':
