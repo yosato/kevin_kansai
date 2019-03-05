@@ -235,8 +235,10 @@ def main():
     Psr.add_argument('--wanted-fts',nargs='+')
 
     Args=Psr.parse_args()
+
+    InFPs=glob.glob(Args.input_glob.strip("'"))
     
-    main0(Args.input_glob.strip("'"))
+    main0(InFPs)
 
 
 if __name__ == '__main__':
