@@ -1,5 +1,5 @@
 from xml.etree import ElementTree as ET
-import os,sys,imp,glob,re
+import os,sys,imp,glob,re,itertools
 from collections import defaultdict,OrderedDict
 sys.path.append('/home/yosato/myProjects/myPythonLibs')
 from pythonlib_ys import main as myModule
@@ -19,10 +19,19 @@ def main0(InFPs,Debug=False):
             Stats[Type][0]+=len(Chains)
             WdCnt=sum(len(Chain) for Chain in Chains)
             Stats[Type][1]+=WdCnt
-#    print(Glob+', '+str(len(InFPs))+' files')
+
+    output_stats(Stats)
+
+def output_stats(Stats):
+    TotalPhrs=sum([Cnts[0] for Cnts in Stats.values()])
+    TotalWds=sum([Cnts[1] for Cnts in Stats.values()])
+    
+    print()
     for Type,Cnts in Stats.items():
-        sys.stdout.write(Type+': '+str(Cnts[0])+' '+str(Cnts[1])+'\n')
-        
+        #print()
+        PhrCnt=Cnts[0];WdCnt=Cnts[1]
+        sys.stdout.write(Type+':\t'+str(PhrCnt)+' ('+str(round((PhrCnt/TotalPhrs)*100,3))+'%)\t'+str(WdCnt)+' ('+str(round((WdCnt/TotalWds)*100,3))+'%)\n')
+    print()    
             
 
 def count_complex_nominals(XmlFP,Debug=False):
@@ -62,9 +71,11 @@ def classify_chain(Chain):
     elif PenulPOS=='形容詞' or PenulPOS=='連体詞':
         Class='adj'
     elif PenulPOS=='助詞':
-        Class='adj'
+        Class='compl'
     else:
         Class='others'
+        #print_orths_from_luws(Chain)
+        #print(PenulPOS)
     return Class
 
 def lengthgroup_chains(Chains):
@@ -104,6 +115,8 @@ def print_orth_from_luw(LUW,Delim=' '):
 
 def print_orths_from_luws(LUWs,Delim='\n'):
     for Cntr,LUW in enumerate(LUWs):
+        if len(LUW)==2:
+            LUW=LUW[1]
         print_orth_from_luw(LUW)
     sys.stdout.write(Delim)
 
@@ -232,7 +245,7 @@ def find_nodes_in_tree(ParentNode,ResNodes=[],TgtNodes='all',ParentToo=True):
 
 def get_fps_withattrib(Dir,Attrib,TgtRegexes,MutualExclP=True):
     FndFPs={TgtRegex:[] for TgtRegex in TgtRegexes}
-    for FP in glob.glob(Dir+'/*.xml'):
+    for Cntr,FP in enumerate(glob.glob(Dir+'/*.xml')):
         SrcValue=get_attrib_fromfp(FP,Attrib)
         for Regex in TgtRegexes:
             CompiledRegex=re.compile(Regex)
@@ -240,6 +253,7 @@ def get_fps_withattrib(Dir,Attrib,TgtRegexes,MutualExclP=True):
                 FndFPs[Regex].append(FP)
                 if MutualExclP:
                     break
+
     return FndFPs
         
 def get_attrib_fromfp(FP,Attrib):
@@ -257,14 +271,24 @@ def main():
     import argparse
     Psr=argparse.ArgumentParser()
     Psr.add_argument('input_dir')
-    Psr.add_argument('attrib')
+    Psr.add_argument('attrib',choices=['SpeakerBirthGeneration','SpeakerBirthPlace','SpeakerSex'])
     Psr.add_argument('tgtvalue_regexes',nargs='+')
     Psr.add_argument('--output-fp')
     Psr.add_argument('--wanted-fts',nargs='+')
 
     Args=Psr.parse_args()
 
-    ClassifiedFPs=get_fps_withattrib(Args.input_dir,Args.attrib,Args.tgtvalue_regexes)
+    FP=os.path.join(Args.input_dir,'-'.join(Args.tgtvalue_regexes)+'.pickle')
+    ClassifiedFPs,_=myModule.ask_filenoexist_execute_pickle(FP,get_fps_withattrib,([Args.input_dir,Args.attrib,Args.tgtvalue_regexes],{}))
+    for (Cat,FPs) in ClassifiedFPs.items():
+        sys.stderr.write(Cat+': '+str(len(FPs))+' files\n')
+        
+    for Pair in itertools.combinations(Args.tgtvalue_regexes,2):
+        Regex1,Regex2=Pair[0],Pair[1]
+        FPs1,FPs2=ClassifiedFPs[Pair[0]],ClassifiedFPs[Pair[1]]
+        Duplicates=set(FPs1).intersection(set(FPs2))
+        if Duplicates:
+            sys.stderr.out('there are duplicates between '+Regex1+' and '+Regex2+'\n')
     for Class,InFPs in ClassifiedFPs.items():
         print(Class)
         main0(InFPs)
