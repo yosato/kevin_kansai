@@ -1,5 +1,5 @@
 from xml.etree import ElementTree as ET
-import os,sys,imp,glob
+import os,sys,imp,glob,re
 from collections import defaultdict,OrderedDict
 sys.path.append('/home/yosato/myProjects/myPythonLibs')
 from pythonlib_ys import main as myModule
@@ -7,7 +7,7 @@ from pythonlib_ys import main as myModule
 imp.reload(myModule)
 
 def main0(InFPs,Debug=False):
-    Stats={'adj':[0,0],'others':[0,0],'pp':[0,0],'relcl':[0,0]}
+    Stats={'adj':[0,0],'others':[0,0],'pp':[0,0],'relcl':[0,0],'compl':[0,0]}
     FailedFPs=[]
     
     for XmlFP in InFPs:
@@ -19,14 +19,14 @@ def main0(InFPs,Debug=False):
             Stats[Type][0]+=len(Chains)
             WdCnt=sum(len(Chain) for Chain in Chains)
             Stats[Type][1]+=WdCnt
-    print(Glob+', '+str(len(InFPs))+' files')
+#    print(Glob+', '+str(len(InFPs))+' files')
     for Type,Cnts in Stats.items():
         sys.stdout.write(Type+': '+str(Cnts[0])+' '+str(Cnts[1])+'\n')
         
             
 
 def count_complex_nominals(XmlFP,Debug=False):
-    ComplexNominalsClassified={'relcl':[],'pp':[],'adj':[],'others':[]}
+    ComplexNominalsClassified={'relcl':[],'pp':[],'adj':[],'compl':[],'others':[]}
     for LUWsPerSent in generate_grouped_luws(XmlFP,Unit='Sentence'):
         if Debug:
             print_orths_from_luws(LUWsPerSent)
@@ -60,6 +60,8 @@ def classify_chain(Chain):
     elif PenulPOS=='名詞' or PenulPOS=='代名詞':
         Class='pp'
     elif PenulPOS=='形容詞' or PenulPOS=='連体詞':
+        Class='adj'
+    elif PenulPOS=='助詞':
         Class='adj'
     else:
         Class='others'
@@ -210,9 +212,10 @@ def return_immediate_targetnodes(ParentNode,TgtNodeName):
     return Nodes
 
 
-def find_nodes_in_tree(ParentNode,ResNodes,TgtNodes='all',ParentToo=True):
+def find_nodes_in_tree(ParentNode,ResNodes=[],TgtNodes='all',ParentToo=True):
     assert TgtNodes=='all' or (isinstance(TgtNodes,list) and len(TgtNodes)==len(set(TgtNodes)))
-    
+    if TgtNodes=='all' or ParentNode.tag in TgtNodes:
+        ResNodes.append((ParentNode,'root'))
     for ChildNode in ParentNode:
         if TgtNodes=='all' or ChildNode.tag in TgtNodes:
             FndEl=(ChildNode,ParentNode) if ParentToo else ChildNode
@@ -220,25 +223,51 @@ def find_nodes_in_tree(ParentNode,ResNodes,TgtNodes='all',ParentToo=True):
             #TgtNodes.remove(ChildNode)
         Children=ChildNode.getchildren()
         if Children:
-            ResNodes=find_nodes_in_tree(ChildNode,ResNodes,TgtNodes=TgtNodes)
+            ResNodes=find_nodes_in_tree(ChildNode,ResNodes=ResNodes,TgtNodes=TgtNodes)
 #        elif any(TgtNode in [Child.tag for Child in Children] for TgtNode in TgtNodes):
 #            sys.stderr.write('something funny')
             
 
     return ResNodes
-    
+
+def get_fps_withattrib(Dir,Attrib,TgtRegexes,MutualExclP=True):
+    FndFPs={TgtRegex:[] for TgtRegex in TgtRegexes}
+    for FP in glob.glob(Dir+'/*.xml'):
+        SrcValue=get_attrib_fromfp(FP,Attrib)
+        for Regex in TgtRegexes:
+            CompiledRegex=re.compile(Regex)
+            if re.match(CompiledRegex,SrcValue):
+                FndFPs[Regex].append(FP)
+                if MutualExclP:
+                    break
+    return FndFPs
+        
+def get_attrib_fromfp(FP,Attrib):
+    InitNode=ET.parse(FP).getroot()
+    Talk=InitNode
+    AsVs=Talk.attrib
+    if Attrib not in AsVs.keys():
+        sys.exit('no such attrib: '+Attrib)
+    return AsVs[Attrib]
+            
+        
+        
+        
 def main():
     import argparse
     Psr=argparse.ArgumentParser()
-    Psr.add_argument('input_glob',type=str)
+    Psr.add_argument('input_dir')
+    Psr.add_argument('attrib')
+    Psr.add_argument('tgtvalue_regexes',nargs='+')
     Psr.add_argument('--output-fp')
     Psr.add_argument('--wanted-fts',nargs='+')
 
     Args=Psr.parse_args()
 
-    InFPs=glob.glob(Args.input_glob.strip("'"))
-    
-    main0(InFPs)
+    ClassifiedFPs=get_fps_withattrib(Args.input_dir,Args.attrib,Args.tgtvalue_regexes)
+    for Class,InFPs in ClassifiedFPs.items():
+        print(Class)
+        main0(InFPs)
 
 
 if __name__ == '__main__':
