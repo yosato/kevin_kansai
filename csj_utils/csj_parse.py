@@ -1,5 +1,5 @@
 from xml.etree import ElementTree as ET
-import os,sys,imp,glob,re,itertools
+import os,sys,imp,glob,re,itertools,time
 from collections import defaultdict,OrderedDict
 sys.path.append('/home/yosato/myProjects/myPythonLibs')
 from pythonlib_ys import main as myModule
@@ -41,9 +41,9 @@ def count_complex_nominals(XmlFP,Debug=False):
             print_orths_from_luws(LUWsPerSent)
             sys.stdout.write('--------------------\n')
         ChainsLUW=get_dependency_chains(LUWsPerSent)
-        if Debug:
-            for Chain in ChainsLUW:
-                print_orths_from_luws(Chain)
+        #if Debug:
+         #   for Chain in ChainsLUW:
+          #      print_orths_from_luws(Chain)
         NominalLUWChains=get_complex_nominals(ChainsLUW)
         LenGroupedNominalLUWChains=lengthgroup_chains(NominalLUWChains)
         for Chains in LenGroupedNominalLUWChains.values():
@@ -56,6 +56,9 @@ def count_complex_nominals(XmlFP,Debug=False):
             if Debug:
                 sys.stdout.write(Class+'\t')
                 print_orths_from_luws([stuff[1] for stuff in ChosenChain])
+                if Class=='others':
+                    print(ChosenChain[-2][1].attrib['LUWPOS'])
+                    #time.sleep(1)
             ComplexNominalsClassified[Class].append(ChosenChain)
 
         if Debug:
@@ -74,8 +77,6 @@ def classify_chain(Chain):
         Class='compl'
     else:
         Class='others'
-        #print_orths_from_luws(Chain)
-        #print(PenulPOS)
     return Class
 
 def lengthgroup_chains(Chains):
@@ -271,9 +272,10 @@ def main():
     import argparse
     Psr=argparse.ArgumentParser()
     Psr.add_argument('input_dir')
-    Psr.add_argument('attrib',choices=['SpeakerBirthGeneration','SpeakerBirthPlace','SpeakerSex'])
+    Psr.add_argument('attrib',choices=['SpeakerBirthGeneration','SpeakerBirthPlace','SpeakerSex','TalkID'])
     Psr.add_argument('tgtvalue_regexes',nargs='+')
     Psr.add_argument('--output-fp')
+    Psr.add_argument('--debug',action='store_true')
     Psr.add_argument('--wanted-fts',nargs='+')
 
     Args=Psr.parse_args()
@@ -291,7 +293,7 @@ def main():
             sys.stderr.out('there are duplicates between '+Regex1+' and '+Regex2+'\n')
     for Class,InFPs in ClassifiedFPs.items():
         print(Class)
-        main0(InFPs)
+        main0(InFPs,Debug=Args.debug)
 
 
 if __name__ == '__main__':
