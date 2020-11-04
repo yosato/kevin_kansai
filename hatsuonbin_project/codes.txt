@@ -1,0 +1,6 @@
+Codes
+Gender: female 0; male 1
+Onbin: no 0; yes 1
+Adjacent: no 0; yes 1
+Traditional: no 0; yes 1
+Neutralized:  no 0; yes 1
