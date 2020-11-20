@@ -10,14 +10,14 @@ def main0(InFPs,Debug=False):
     Stats={'adj':[0,0],'others':[0,0],'pp':[0,0],'relcl':[0,0],'compl':[0,0]}
     FailedFPs=[]
     
-    for XmlFP in InFPs:
-        try:
-            CompNomsPerFile=count_complex_nominals(XmlFP,Debug=Debug)
-        except:
-            FailedFPs.append(XmlFP)
+    for Cntr,XmlFP in enumerate(InFPs):
+        if Cntr!=0 and (Cntr+1)%100==0:
+            sys.stderr.write(str(Cntr+1)+' files done\n')
+        CompNomsPerFile=count_complex_nominals(XmlFP,Debug=Debug)
+        
         for (Type,Chains) in CompNomsPerFile.items():
             Stats[Type][0]+=len(Chains)
-            WdCnt=sum(len(Chain) for Chain in Chains)
+            WdCnt=sum(Chain[-1][0]-Chain[0][0] for Chain in Chains)
             Stats[Type][1]+=WdCnt
 
     output_stats(Stats)
@@ -29,8 +29,8 @@ def output_stats(Stats):
     print()
     for Type,Cnts in Stats.items():
         #print()
-        PhrCnt=Cnts[0];WdCnt=Cnts[1]
-        sys.stdout.write(Type+':\t'+str(PhrCnt)+' ('+str(round((PhrCnt/TotalPhrs)*100,3))+'%)\t'+str(WdCnt)+' ('+str(round((WdCnt/TotalWds)*100,3))+'%)\n')
+        PhrCnt=Cnts[0];WdCnt=Cnts[1];WdsPerPhr=round(WdCnt/PhrCnt,2)
+        sys.stdout.write(Type+':\t'+str(PhrCnt)+' ('+str(round((PhrCnt/TotalPhrs)*100,3))+'%)\t'+str(WdCnt)+' ('+str(WdsPerPhr)+')\n')
     print()    
             
 
@@ -40,7 +40,10 @@ def count_complex_nominals(XmlFP,Debug=False):
         if Debug:
             print_orths_from_luws(LUWsPerSent)
             sys.stdout.write('--------------------\n')
-        ChainsLUW=get_dependency_chains(LUWsPerSent)
+        try:
+            ChainsLUW=extract_dep_chains_from_luws(LUWsPerSent)
+        except:
+            extract_dep_chains_from_luws(LUWsPerSent)
         #if Debug:
          #   for Chain in ChainsLUW:
           #      print_orths_from_luws(Chain)
@@ -66,15 +69,16 @@ def count_complex_nominals(XmlFP,Debug=False):
     return ComplexNominalsClassified
 
 def classify_chain(Chain):
+    LstOrth=Chain[-1][1].attrib['LUWLemma']
     PenulPOS=Chain[-2][1].attrib['LUWPOS']
-    if PenulPOS=='動詞':
+    if PenulPOS=='助詞' or LstOrth=='事':
+        Class='compl'
+    elif PenulPOS=='動詞':
         Class='relcl'
     elif PenulPOS=='名詞' or PenulPOS=='代名詞':
         Class='pp'
     elif PenulPOS=='形容詞' or PenulPOS=='連体詞':
         Class='adj'
-    elif PenulPOS=='助詞':
-        Class='compl'
     else:
         Class='others'
     return Class
@@ -124,48 +128,44 @@ def print_orths_from_luws(LUWs,Delim='\n'):
 def get_suws(LUW):
     return [Child for Child in LUW if Child.tag=='SUW']
 
-def get_dependency_chains(LUWsPerSent):
-    ChainsNum=extract_dep_chain_from_luws(LUWsPerSent)
-    ChainsLUW=[]
-    for ChainNum in ChainsNum:
-        ChainsLUW.append([(Ind,LUWsPerSent[Ind]) for Ind in ChainNum])
-    return ChainsLUW        
 
 def find_next_connections(OrgPair,TgtPairs):
     return [Pair for Pair in TgtPairs if Pair[0]==OrgPair[1]]
     
 
 
-def extract_dep_chain_from_luws(LUWsPerSent):
-    MderIDs=[];MdedIDs=[]
-    for LUWCntr,LUW in enumerate(LUWsPerSent):
-        MderID,MdedID=[(Ind,int(Ft)) if Ft is not None else None for Ind,Ft in get_next_suwfeats_withinds(LUW,['Dep_BunsetsuUnitID','Dep_ModifieeBunsetsuUnitID'])]
-        if MderID:
-            MderIDs.append(((LUWCntr,)+(MderID[0],),MderID[1]))
-        if MdedID:
-            MdedIDs.append(((LUWCntr,)+(MdedID[0],),MdedID[1]))
- #   print(MdedIDs)
-  #  print(MderIDs)
-    if not MdedIDs:
-        return []
-    Binaries=[]
-    for (MdedPoss,MdedID) in MdedIDs:
-        MderPoss=next(MderID[0] for MderID in MderIDs if MderID[1]==MdedID)
-        Binaries.append((MdedPoss,MderPoss,))
-    Binaries=[(Poss[0][0],Poss[1][0]) for Poss in Binaries]
-    Chains=myModule.Tree(Binaries).create_paths(NoInitTerms=True)
-    FlatChains=[]
-    for Chain in Chains:
-        if len(Chain)==1:
-            FlatChain=Chain[0]
-        else:
-            FlatChain=[]
-            for Node in Chain:
-                FlatChain.append(Node[0])
-            FlatChain.append(Chain[-1][-1])
-            FlatChain=tuple(FlatChain)
-        FlatChains.append(FlatChain)
-    return FlatChains
+def extract_dep_chains_from_luws(LUWsPerSent):
+    RevLUWsWithInds=[(Ind,LUW) for (Ind,LUW) in enumerate(LUWsPerSent)][::-1]
+    DepPosEdges=[];DepLUWs=[];Poss=[];IDs=[]
+    for LUWPos,LUW in RevLUWsWithInds:
+        ID,DepDstID=[int(Ft) if Ft is not None else None for _,Ft in get_next_suwfeats_withinds(LUW,['Dep_BunsetsuUnitID','Dep_ModifieeBunsetsuUnitID'])]
+        if ID:
+            Poss.append(LUWPos)
+            IDs.append(ID)
+        if DepDstID and DepDstID in IDs:
+            DepDstPos=next(Pos for (Pos,ID) in zip(Poss,IDs) if DepDstID==ID)
+            DepPosEdges.append((LUWPos,DepDstPos))
+            #DepLUWs=(LUWsPerSent[LUWPos],LUW)
+
+    ChainsLUW=[]
+    if DepPosEdges:
+        Chains=myModule.Tree(DepPosEdges).create_paths(NoInitTerms=True)
+        FlatChains=[]
+        for Chain in Chains:
+            if len(Chain)==1:
+                FlatChain=Chain[0]
+            else:
+                FlatChain=[]
+                for Node in Chain:
+                    FlatChain.append(Node[0])
+                FlatChain.append(Chain[-1][-1])
+                FlatChain=tuple(FlatChain)
+            FlatChains.append(FlatChain)
+
+        for ChainNum in FlatChains:
+            ChainsLUW.append([(Ind,LUWsPerSent[Ind]) for Ind in ChainNum])
+    return ChainsLUW        
+
 
 def get_next_suwfeats_withinds(LUW,FtNames):
     Fts=get_repeated_list((None,None),len(FtNames))

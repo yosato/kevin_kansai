@@ -1,3 +1,5 @@
+#!/bin/bash
+
 FN=$1
 
 cat $FN|awk -F"," '{print $1,$5}'|sed 's/ *$//'|sed -r 's:([\t ]+):/:g'|tr '\n' ' '|sed 's/ *EOS */\n/g' 

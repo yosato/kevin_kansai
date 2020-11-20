@@ -1,9 +1,9 @@
 import os
 
-SUP_FILE = os.path.dirname(__file__) + "\\dic_files\\west_supplement.csv"
-NOUN_FILE = os.path.dirname(__file__) + "\\dic_files\\west_nouns.csv"
-DIC_DIR = os.path.dirname(__file__) + "\\dic_files\\"
-STRIPPED_DIC_DIR = os.path.dirname(__file__) + "\\stripped_dic_files\\"
+SUP_FILE = os.path.dirname(__file__) + "/dic_files/west_supplement.csv"
+NOUN_FILE = os.path.dirname(__file__) + "/dic_files/west_nouns.csv"
+DIC_DIR = os.path.dirname(__file__) + "/dic_files/"
+STRIPPED_DIC_DIR = os.path.dirname(__file__) + "/stripped_dic_files/"
 
 class CorpusDictionaries:
     '''This class contains the contents of all of the corpus dictionaries. It is used to compare a mecab file against the dictionaries
