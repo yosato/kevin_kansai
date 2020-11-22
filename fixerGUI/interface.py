@@ -4,6 +4,7 @@ from tkinter import scrolledtext as sctxt
 from tkinter import filedialog
 import kana_converter as kc
 import file_handler as fh
+import sys,os
 
 ##################################################
 # ます	助動詞, *, *, *, 特殊マス, 基本形, ます, マス, マス
@@ -186,8 +187,8 @@ class Interface():
 
 def fileOpener():
     options = {}
-    options['filetypes'] = [('all files', '.*'), ('mecab files', '.mecab')]
-    options['initialdir'] = "C:\\Users\\Kevin\\Dropbox\\Work\\python\\fixerGUI\\in\\"
+#    options['filetypes'] = [('all files', '.*'), ('mecab files', '.mecab')]
+    options['initialdir'] = os.path.join(os.getcwd(),"in")
     root = tk.Tk()
     root.withdraw()
     file_name = tk.filedialog.askopenfilename( **options )

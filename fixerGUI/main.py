@@ -3,8 +3,9 @@ import dictionary_handler as dh
 import interface as i
 import os
 
-IN_DIR = os.path.dirname(__file__) + "\\in\\"
-OUT_DIR = os.path.dirname(__file__) + "\\out\\"
+
+IN_DIR = os.path.dirname(__file__) + "/in"
+OUT_DIR = os.path.dirname(__file__) + "/out"
 
 print(IN_DIR)
 
