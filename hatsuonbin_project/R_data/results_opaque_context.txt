@@ -1,0 +1,41 @@
+Generalized linear mixed model fit by maximum likelihood (Laplace Approximation) ['glmerMod']
+ Family: binomial  ( logit )
+Formula: onbin ~ speech_style + adjacent + f_pos + mpFreq + mpfp + (1 | speaker) + (1 | word)
+   Data: onbin_opaque
+Control: glmerControl(optimizer = "bobyqa")
+
+     AIC      BIC   logLik deviance df.resid 
+   230.1    286.8   -105.0    210.1     2129 
+
+Scaled residuals: 
+    Min      1Q  Median      3Q     Max 
+-0.1765  0.0000  0.0000  0.0000  0.2010 
+
+Random effects:
+ Groups  Name        Variance Std.Dev.
+ word    (Intercept) 4235.4   65.08   
+ speaker (Intercept)  638.2   25.26   
+Number of obs: 2139, groups:  word, 542; speaker, 191
+
+Fixed effects:
+                   Estimate Std. Error    z value Pr(>|z|)    
+(Intercept)      -42.533036   0.001299 -32734.830   <2e-16 ***
+speech_style     -19.230757   0.001330 -14456.231   <2e-16 ***
+adjacent          -7.611700   0.001281  -5940.375   <2e-16 ***
+f_posnom         -12.120300   0.002151  -5635.415   <2e-16 ***
+f_posother.gramm   5.658592  19.780433      0.286    0.775    
+f_possfp           5.421340   0.001549   3498.791   <2e-16 ***
+mpFreq            -1.579812   0.002853   -553.667   <2e-16 ***
+mpfp             -18.302072   0.001358 -13479.531   <2e-16 ***
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Correlation of Fixed Effects:
+            (Intr) spch_s adjcnt f_psnm f_pst. f_pssf mpFreq
+speech_styl  0.025                                          
+adjacent     0.009  0.010                                   
+f_posnom    -0.021 -0.040 -0.008                            
+f_psthr.grm -0.001  0.000  0.002  0.000                     
+f_possfp    -0.028 -0.054 -0.011  0.146 -0.002              
+mpFreq       0.009  0.017  0.003 -0.189  0.000 -0.062       
+mpfp         0.026  0.051  0.010 -0.056  0.000 -0.074  0.024

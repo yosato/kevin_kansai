@@ -1,0 +1,45 @@
+> summary(model4c)
+Generalized linear mixed model fit by maximum likelihood (Laplace Approximation) ['glmerMod']
+ Family: binomial  ( logit )
+Formula: onbin ~ speech_style + adjacent + f_pos + mpFreq + mpfp + (1 | speaker) + (1 | word)
+   Data: onbin_non_opaque
+Control: glmerControl(optimizer = "bobyqa")
+
+     AIC      BIC   logLik deviance df.resid 
+  6168.9   6242.7  -3073.4   6146.9     6054 
+
+Scaled residuals: 
+    Min      1Q  Median      3Q     Max 
+-7.2154 -0.6240  0.2500  0.5536 15.2556 
+
+Random effects:
+ Groups  Name        Variance Std.Dev.
+ word    (Intercept) 0.1941   0.4406  
+ speaker (Intercept) 0.6358   0.7974  
+Number of obs: 6065, groups:  word, 1076; speaker, 193
+
+Fixed effects:
+                 Estimate Std. Error z value Pr(>|z|)    
+(Intercept)      -2.66284    1.05689  -2.519 0.011752 *  
+speech_style     -2.52032    0.49520  -5.090 3.59e-07 ***
+adjacent         -0.29377    0.13662  -2.150 0.031537 *  
+f_posdis          6.02911    1.04143   5.789 7.07e-09 ***
+f_posnom          3.78256    1.03616   3.651 0.000262 ***
+f_posother.gramm  3.00841    1.04181   2.888 0.003881 ** 
+f_possfp          3.95303    1.03621   3.815 0.000136 ***
+mpFreq            1.28991    0.07607  16.958  < 2e-16 ***
+mpfp              0.60167    0.03488  17.249  < 2e-16 ***
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Correlation of Fixed Effects:
+            (Intr) spch_s adjcnt f_psds f_psnm f_pst. f_pssf mpFreq
+speech_styl -0.147                                                 
+adjacent    -0.124  0.009                                          
+f_posdis    -0.966 -0.012 -0.004                                   
+f_posnom    -0.969 -0.011 -0.023  0.991                            
+f_psthr.grm -0.967 -0.007 -0.003  0.986  0.990                     
+f_possfp    -0.970 -0.007 -0.023  0.991  0.997  0.991              
+mpFreq      -0.083 -0.011  0.589  0.008 -0.029 -0.008 -0.043       
+mpfp         0.081 -0.001 -0.347  0.054  0.032  0.034  0.021  0.042
+
