@@ -1,0 +1,8 @@
+[submodule "normalise_jp"]
+	path = normalise_jp
+	url = https://github.com/yosato/normalise_jp.git
+	branch = master
+[submodule "myPythonLibs"]
+	path = myPythonLibs
+	url = https://github.com/yosato/myPythonLibs.git
+	branch = master
