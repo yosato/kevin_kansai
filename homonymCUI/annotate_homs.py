@@ -1,13 +1,16 @@
 import os,imp,pickle,sys,json,glob
 from mecabtools import mecabtools
 sys.path.append('../normalise_jp')
+sys.path.append('../myPythonLibs')
 import normalise_mecab
 
 import pythonlib_ys
 imp.reload(mecabtools)
 imp.reload(pythonlib_ys)
 
+# this needs to be adapted Kevin
 RepoRt='/Users/yosato/myProjects_maclocal'
+
 RepoDir=os.path.join(RepoRt,'kevin_kansai')
 ResultDir=os.path.join(RepoDir,'homonymCUI/results')
 GlobalJson=os.path.join(ResultDir,'globalrecord.json')
@@ -20,8 +23,6 @@ FPs=glob.glob(os.path.join(MecabDir,'[KT]*.txt'))
 
 if not FPs:
     sys.exit('probably you get the wrong RepoDir\n\n')
-
-
 
 with open(os.path.join(RepoDir,'clustered_homs.pickle'),'br') as FSr:
     CHs= pickle.load(FSr)
