@@ -15,8 +15,8 @@ GlobalRecord=json.load(open(GlobalJson))
 
 global MecabDir
 MecabDir=os.path.join(RepoDir,'corpus_files')
-#FPs=glob.glob(os.path.join(MecabDir,'[KT]*.txt'))
-FPs=glob.glob(os.path.join(MecabDir,'aiueo*.txt'))
+FPs=glob.glob(os.path.join(MecabDir,'[KT]*.txt'))
+#FPs=glob.glob(os.path.join(MecabDir,'aiueo*.txt'))
 
 if not FPs:
     sys.exit('probably you get the wrong RepoDir\n\n')
