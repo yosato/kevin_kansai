@@ -1,4 +1,5 @@
 import os,imp,pickle,sys,json,glob
+from termcolor import colored
 from mecabtools import mecabtools
 sys.path.append('../normalise_jp')
 sys.path.append('../myPythonLibs')
@@ -62,7 +63,7 @@ def backend(Name,PersRecord,FPs,CHs):
     if RemainingCnt==0:
         print('すべてのファイルが完了しました。協力ありがとうございました')
     print('お疲れ様!!!')
-
+    
 
 def annotate_homonyms(FP,CHs,CHProns,CHKeys):
     def find_relv_ch(CHs,CHProns,CHKeys,SentLines):
@@ -81,7 +82,7 @@ def annotate_homonyms(FP,CHs,CHProns,CHKeys):
             if Bool:
                 RelvIndPairs.append((SentInd,CHInd))
         return RelvIndPairs
-    Question='以下の文の###(番号) xx ##でマークされた部分を自分ならどう書くかについて、後続の候補にランクを付けます。ランクは１０から０で、合計が１０になるよう、三つの候補があった場合は1 6 3のように書いてください。'
+
     RecordPerFile={'records':{},'errors':[]}
     PrvLines=''
     for SentCntr,SentLines in enumerate(mecabtools.generate_sentchunks(FP)):
@@ -90,17 +91,17 @@ def annotate_homonyms(FP,CHs,CHProns,CHKeys):
         if not RelvIndPairs:
             pass
         else:
-            try:
-                Wds=[mecabtools.mecabline2mecabwd(SentLine,'corpus') for SentLine in SentLines]
-            except:
+            Wds=[mecabtools.mecabline2mecabwd(SentLine,'corpus') for SentLine in SentLines]
+            if any(Wd is None for Wd in Wds):
                 continue
+
             Sent=mecabtools.MecabSentParse(Wds)
             (RelvSentInds,RelvCHInds)=zip(*RelvIndPairs)
             SentID=os.path.basename(FP)+'_'+str(SentCntr)
             PrvSent=''.join([PrvLine.split('\t')[0] for PrvLine in PrvLines])
             if len(PrvSent)>90:
                 PrvSent=PrvSent[-90:]
-            RenderedSent='\n[直前の内容]...('+PrvSent+')\n'+''.join([' ##('+str(RelvSentInds.index(Ind)+1)+')'+Wd.pronunciation+'## ' if Ind in RelvSentInds else Wd.orth for (Ind,Wd) in enumerate(Sent.wds)])
+            RenderedSent='\n[直前の内容]...('+PrvSent+')\n'+''.join([colour_string_cycle('##'+Wd.pronunciation+'##',RelvSentInds.index(Ind)+1) if Ind in RelvSentInds else Wd.orth for (Ind,Wd) in enumerate(Sent.wds)])
             print(RenderedSent)
             Inputs=[]
             for (Num,(RelvSentInd,RelvCHInd)) in enumerate(RelvIndPairs):
@@ -110,9 +111,31 @@ def annotate_homonyms(FP,CHs,CHProns,CHKeys):
                 Inputs.append(ValidatedInput)
             RecordPerFile['records'][SentID]=Inputs
             RecordPerFile['errors'].extend(Errors)
+            clear()
         PrvLines=SentLines
     print(FP+' done')
     return RecordPerFile
+
+def colour_string_cycle(Str,Cycle):
+    Mod=Cycle%3
+    if Mod==0:
+        Colour='blue'
+    elif Mod==1:
+        Colour='green'
+    else:
+        Colour='red'
+    return colored(Str,Colour,attrs=['bold'])
+
+def clear(): 
+  
+    # for windows 
+    if os.name == 'nt': 
+        _ = os.system('cls') 
+  
+    # for mac and linux(here, os.name is 'posix') 
+    else: 
+        _ = os.system('clear') 
+  
 
 def validate_input(OrgStr,Num,Delim=' '):
     if OrgStr.strip().lower()=='x':
@@ -126,8 +149,13 @@ def validate_input(OrgStr,Num,Delim=' '):
         print('ランクは整数で入力してください')
         return None
     Ints=[int(Substr) for Substr in Substrs]
-    if len(Ints)!=Num:
-        print('ランクは各項目に一つずつつけてください')
+    ElCnt=len(Ints)
+    if not ElCnt==Num:
+      #  if ElCnt==Num-1:
+       #     LastNum=10-sum(Ints)
+        #    Ints.append(LastNum)
+        #else:
+        print('ランクは各項目につけてください')
         return None
     if sum(Ints)!=10:
         print('ランクは和が１０になるようにしてください')
@@ -144,7 +172,7 @@ def abc(num,StartChar='a',Delim=' '):
 def get_validate_input(Num,Wd,CH):
     InputValidP=False
     while not InputValidP:
-        print('('+str(Num)+')'+Wd.pronunciation)
+        print(colour_string_cycle(Wd.pronunciation,Num))
         OrthCands=list({Wd.orth for Wd in CH.all_words})
         print(' '.join(OrthCands))
         CandCnt=len(OrthCands)
