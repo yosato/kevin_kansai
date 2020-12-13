@@ -1,8 +1,9 @@
 import os,imp,pickle,sys,json,glob
 from termcolor import colored
-from mecabtools import mecabtools
+
 sys.path.append('../normalise_jp')
 sys.path.append('../myPythonLibs')
+from mecabtools import mecabtools
 import normalise_mecab
 
 import pythonlib_ys
@@ -10,7 +11,8 @@ imp.reload(mecabtools)
 imp.reload(pythonlib_ys)
 
 # this needs to be adapted Kevin
-RepoRt='/Users/yosato/myProjects_maclocal'
+#RepoRt='/Users/yosato/myProjects_maclocal'
+RepoRt='/home/motok'
 
 RepoDir=os.path.join(RepoRt,'kevin_kansai')
 ResultDir=os.path.join(RepoDir,'homonymCUI/results')
