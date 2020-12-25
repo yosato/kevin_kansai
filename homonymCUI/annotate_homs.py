@@ -20,7 +20,7 @@ GlobalJson=os.path.join(ResultDir,'globalrecord.json')
 GlobalRecord=json.load(open(GlobalJson))
 
 global MecabDir
-MecabDir=os.path.join(RepoDir,'corpus_files')
+MecabDir=os.path.join(RepoDir,'corpus_files_test')
 FPs=glob.glob(os.path.join(MecabDir,'[KT]*.txt'))
 #FPs=glob.glob(os.path.join(MecabDir,'aiueo*.txt'))
 
@@ -33,6 +33,7 @@ with open(os.path.join(RepoDir,'clustered_homs.pickle'),'br') as FSr:
 def main():    
     Name=input_name()
     PersRecord=register_or_retrieve_namedrecord(Name)
+    clear()
     NewPersRecord=backend(Name,PersRecord,FPs,CHs)
     
 def backend(Name,PersRecord,FPs,CHs):
@@ -77,8 +78,13 @@ def annotate_homonyms(FP,CHs,CHProns,CHKeys):
         RelvIndPairs=[]
         for SentInd,SentLine in enumerate(SentLines):
             Bool=False
+            Orth,Rest=SentLine.split('\t')
+            Fts=Rest.split(',')
+            LineEls=[Orth]+Fts
+            if not any(PotPron in LineEls for PotPron in PotProns):
+                continue
             for CHInd,CH in enumerate(CHs):
-                if all(CHEl in SentLine for CHEl in CH.cluster_on.values()):
+                if all(CHEl in LineEls for CHEl in CH.cluster_on.values()):
                     Bool=True
                     break
             if Bool:
@@ -96,7 +102,6 @@ def annotate_homonyms(FP,CHs,CHProns,CHKeys):
             Wds=[mecabtools.mecabline2mecabwd(SentLine,'corpus') for SentLine in SentLines]
             if any(Wd is None for Wd in Wds):
                 continue
-
             Sent=mecabtools.MecabSentParse(Wds)
             (RelvSentInds,RelvCHInds)=zip(*RelvIndPairs)
             SentID=os.path.basename(FP)+'_'+str(SentCntr)
