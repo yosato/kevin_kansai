@@ -2,8 +2,15 @@ import os,imp,pickle,sys,json,glob
 import numpy as np
 from termcolor import colored
 
-sys.path.append('../normalise_jp')
-sys.path.append('../myPythonLibs')
+# this needs to be adapted Kevin
+#RepoRt='/Users/yosato/myProjects_maclocal'
+RepoRt='/cygwin64/home/motok'
+
+RepoDir=os.path.join(RepoRt,'kevin_kansai')
+
+sys.path.append(os.path.join(RepoDir,'myPythonLibs'))
+sys.path.append(os.path.join(RepoDir,'normalise_jp'))
+
 from mecabtools import mecabtools
 import normalise_mecab
 
@@ -11,14 +18,9 @@ import pythonlib_ys
 imp.reload(mecabtools)
 imp.reload(pythonlib_ys)
 
-# this needs to be adapted Kevin
-RepoRt='/Users/yosato/myProjects_maclocal'
-#RepoRt='/home/motok'
+global ResultDir
+ResultDir=os.getenv('HOMEPATH')
 
-RepoDir=os.path.join(RepoRt,'kevin_kansai')
-ResultDir=os.path.join(RepoDir,'homonymCUI/results')
-GlobalJson=os.path.join(ResultDir,'globalrecord.json')
-GlobalRecord=json.load(open(GlobalJson))
 
 global MecabDir
 MecabDir=os.path.join(RepoDir,'corpus_files')
@@ -33,7 +35,7 @@ with open(os.path.join(RepoDir,'clustered_homs.pickle'),'br') as FSr:
 
 def main():    
     Name=input_name()
-    PersRecord=register_or_retrieve_namedrecord(Name)
+    PersRecord=register_or_retrieve_namedrecord(Name,ResultDir)
     clear()
     NewPersRecord=backend(Name,PersRecord,FPs,CHs)
     
@@ -224,7 +226,7 @@ def save_record(Name,Record):
     open(UserJson,'wt').write(json.dumps(Record,ensure_ascii=False))
     print('ここまでの作業内容は保存されました。')
     
-def register_or_retrieve_namedrecord(Name):
+def register_or_retrieve_namedrecord(Name,ResultDir):
     InputValid=False
     while not InputValid:
         UserJson=os.path.join(ResultDir,'personalrecord_'+Name+'.json')
