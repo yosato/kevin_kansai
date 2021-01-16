@@ -1,4 +1,4 @@
-import os,imp,pickle,sys,json,glob
+import os,imp,pickle,sys,json,glob,copy
 import numpy as np
 from termcolor import colored
 
@@ -71,7 +71,38 @@ def backend(Name,PersRecord,FPs,CHs):
     print('お疲れ様!!!')
     
 
-def annotate_homonyms(FP,CHs,CHProns,CHKeys,CHFreqsTotal):
+def annotate_homonyms(FP,CHs,CHProns,CHKeys,CHFreqsTotal,PerFileThresh=3,TotalThresh=20):
+    def get_relvsents(FP,CHs,CHProns,CHKeys,CHFreqsTotal,PerFileThresh,TotalThresh):
+        RelvSents={}
+        CHFreqsPerFile=np.zeros((len(CHs)))
+        with open(FP) as FSr:
+            for SentCntr,SentLines in enumerate(mecabtools.generate_sentchunks(FP)):
+                if SentCntr%20==0:
+                    print(SentCntr)
+                RelvIndPairs=find_relv_ch(CHs,CHProns,CHKeys,SentLines)
+                if not RelvIndPairs:
+                    pass
+                else:
+                    Wds=[mecabtools.mecabline2mecabwd(SentLine,'corpus') for SentLine in SentLines]
+                    if any(Wd is None for Wd in Wds):
+                        continue
+                    Sent=mecabtools.MecabSentParse(Wds)
+                    (RelvSentInds,RelvCHInds)=zip(*RelvIndPairs)
+                    (RelvSentInds,RelvCHInds)=list(RelvSentInds),list(RelvCHInds)
+                    PrvSent=' '.join([Line.split('\t')[0] for Line in PrvSentLines])
+
+                    OverThreshPoss=[]
+                    for Pos,CHInd in enumerate(RelvCHInds):
+                        CHFreqsPerFile[CHInd]+=1
+                        if CHFreqsTotal[CHInd]>TotalThresh or CHFreqsPerFile[CHInd]>PerFileThresh:
+                            OverThreshPoss.append(Pos)
+
+                    RelvSents[SentCntr]=(RelvSentInds,RelvCHInds,Sent,PrvSent,OverThreshPoss)
+
+                PrvSentLines=SentLines
+                    
+        return RelvSents,CHFreqsPerFile
+
     def find_relv_ch(CHs,CHProns,CHKeys,SentLines):
         SentEls=pythonlib_ys.main.flatten_list([(lambda SentLine: [SentLine.split('\t')[0]]+SentLine.split('\t')[1].split(','))(SentLine) for SentLine in SentLines])
         PotProns=[CHPron for CHPron in CHProns if CHPron in SentEls]
@@ -94,49 +125,40 @@ def annotate_homonyms(FP,CHs,CHProns,CHKeys,CHFreqsTotal):
                 RelvIndPairs.append((SentInd,CHInd))
         return RelvIndPairs
 
-    CHFreqsPerFile=np.zeros((len(CHs)))
+    FN=os.path.basename(FP)
+
+    RelvSents,CHFreqsPerFile=get_relvsents(FP,CHs,CHProns,CHKeys,CHFreqsTotal,PerFileThresh,TotalThresh)
+    SentsToDoCnt=len([RelvSent for RelvSent in RelvSents.values() if RelvSent[-1]])
+    #print('このファイル（'+FN+'）では合計'+str()+'件設問があります')
     RecordPerFile={'records':{},'errors':[]}
-    PrvLines=''
-    for SentCntr,SentLines in enumerate(mecabtools.generate_sentchunks(FP)):
+    PrvLines='';SentCntInFile=0
+    for Cntr,(SentCntr,(RelvSentInds,RelvCHInds,Sent,PrcSent,OverThreshPoss)) in enumerate(RelvSents.items()):
+        if OverThreshPoss:
+#            print('threshold reached for '+' '.join([Sent.wds[Ind].orth for Ind in RelvSentInds]))
+            if len(OverThreshPoss)==len(RelvSentInds):
+                continue
+            else:
+                for Ind in OverThreshPoss[::-1]:
+                    RelvSentInds.pop(Ind);RelvCHInds.pop(Ind)
+        WdOrthsToCome=[Wd.orth for (Ind,Wd) in enumerate(Sent.wds) if Ind in RelvSentInds]           
+        if Cntr!=0 and all(PrvWdOrth in WdOrthsToCome for PrvWdOrth in PrvDealtWdOrths):
+            continue
         Errors=[]
-        RelvIndPairs=find_relv_ch(CHs,CHProns,CHKeys,SentLines)
-        if not RelvIndPairs:
-            pass
-        else:
-            Wds=[mecabtools.mecabline2mecabwd(SentLine,'corpus') for SentLine in SentLines]
-            if any(Wd is None for Wd in Wds):
-                continue
-            Sent=mecabtools.MecabSentParse(Wds)
-            (RelvSentInds,RelvCHInds)=zip(*RelvIndPairs)
-            (RelvSentInds,RelvCHInds)=list(RelvSentInds),list(RelvCHInds)
-            SentID=os.path.basename(FP)+'_'+str(SentCntr)
-            OverThreshs=[]
-            for Cntr,CHInd in enumerate(RelvCHInds):
-                CHFreqsPerFile[CHInd]+=1
-                if CHFreqsPerFile[CHInd]>3 or CHFreqsPerFile[CHInd]+CHFreqsTotal[CHInd]>10:
-                    OverThreshs.append(Cntr)
-            for OverThresh in OverThreshs[::-1]:
-                RelvSentInds.pop(OverThresh)
-                RelvCHInds.pop(OverThresh)
-                RelvIndPairs=zip(RelvSentInds,RelvCHInds)
-            if not RelvSentInds:
-                continue
-            PrvSent=''.join([PrvLine.split('\t')[0] for PrvLine in PrvLines])
-            if len(PrvSent)>90:
-                PrvSent=PrvSent[-90:]
-            RenderedSent='\n[直前の内容]...('+PrvSent+')\n'+''.join([colour_string_cycle('##'+Wd.pronunciation+'##',RelvSentInds.index(Ind)+1) if Ind in RelvSentInds else Wd.orth for (Ind,Wd) in enumerate(Sent.wds)])
-            print(RenderedSent)
-            Inputs=[]
-            for (Num,(RelvSentInd,RelvCHInd)) in enumerate(RelvIndPairs):
-                ValidatedInput=get_validate_input(Num+1,Sent.wds[RelvSentInd],CHs[RelvCHInd])
-                if ValidatedInput is False:
-                    Errors.append([SentID,Num])
-                Inputs.append(ValidatedInput)
-            RecordPerFile['records'][SentID]=Inputs
-            RecordPerFile['errors'].extend(Errors)
-            
-            clear()
-        PrvLines=SentLines
+        SentID=FN+str(SentCntr)
+        RenderedSent='文'+str(Cntr+1)+'(全'+str(SentsToDoCnt)+'文中):\n[直前の内容]...('+PrcSent.replace(' ','')+')\n'+''.join([colour_string_cycle('##'+Wd.pronunciation+'##',RelvSentInds.index(Ind)+1) if Ind in RelvSentInds else Wd.orth for (Ind,Wd) in enumerate(Sent.wds)])
+        print(RenderedSent)
+        Inputs=[]
+
+        for (Num,(RelvSentInd,RelvCHInd)) in enumerate(zip(RelvSentInds,RelvCHInds)):
+            ValidatedInput=get_validate_input(Num+1,Sent.wds[RelvSentInd],CHs[RelvCHInd])
+            if ValidatedInput is False:
+                Errors.append([SentID,Num])
+            Inputs.append(ValidatedInput)
+        RecordPerFile['records'][SentID]=Inputs
+        RecordPerFile['errors'].extend(Errors)
+
+        PrvDealtWdOrths=WdOrthsToCome
+        clear()
     print(FP+' done')
     return RecordPerFile,CHFreqsPerFile
 
