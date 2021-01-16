@@ -1,14 +1,11 @@
-import os,imp,pickle,sys,json,glob
+import os,imp,pickle,sys,json,glob,copy
 import numpy as np
 from termcolor import colored
+from pythonlib_ys import main as myModule
 
-HomeDir=os.getenv('HOMEPATH') if os.name=='nt' else os.getenv('HOME')
-
-RepoDir=os.path.join(HomeDir,'kevin_kansai')
-assert os.path.isdir(RepoDir),'repo does not exist'
-
-#sys.path.append(os.path.join(RepoDir,'myPythonLibs'))
 #sys.path.append(os.path.join(RepoDir,'normalise_jp'))
+HomeDir=os.getenv('HOMEPATH') if os.name=='nt' else os.getenv('HOME')
+DefRepoDir=os.path.join(HomeDir,'kevin_kansai')
 
 from mecabtools import mecabtools
 import normalise_mecab
@@ -17,27 +14,25 @@ import pythonlib_ys
 imp.reload(mecabtools)
 imp.reload(pythonlib_ys)
 
-global ResultDir
-ResultDir=os.getenv('HOMEPATH')
-
-
-global MecabDir
-MecabDir=os.path.join(RepoDir,'corpus_files')
-FPs=glob.glob(os.path.join(MecabDir,'[KT]*.txt'))
-#FPs=glob.glob(os.path.join(MecabDir,'aiueo*.txt'))
-
-if not FPs:
-    sys.exit('probably you get the wrong RepoDir\n\n')
-
-with open(os.path.join(RepoDir,'clustered_homs.pickle'),'br') as FSr:
-    CHs= pickle.load(FSr)
-
 def main():    
+    FPs,CHs,ResultDir=get_data(RepoDir)
     Name=input_name()
     PersRecord=register_or_retrieve_namedrecord(Name,ResultDir)
     clear()
     NewPersRecord=backend(Name,PersRecord,FPs,CHs)
-    
+
+def get_data(RepoDir):
+    CorpusDir=os.path.join(RepoDir,'corpus_files')
+    CHFP=os.path.join(CorpusDir,'clustered_homs.pickle')
+    FPs=glob.glob(os.path.join(CorpusDir,'*.txt'))
+    ResultDir=RepoDir+'/homonymCUI/results'
+    if not os.path.isfile(CHFP) or not os.path.isdir(ResultDir) or not FPs:
+        sys.exit('probably you use the wrong dir for repository')
+    with open(CHFP,'br') as FSr:
+        CHs= pickle.load(FSr)
+
+    return FPs,CHs,ResultDir
+
 def backend(Name,PersRecord,FPs,CHs):
     CHFreqsTotal=np.zeros(len(CHs))
     DoneFNs=PersRecord['done_fns']
@@ -97,7 +92,7 @@ def annotate_homonyms(FP,CHs,CHProns,CHKeys,CHFreqsTotal):
 
     CHFreqsPerFile=np.zeros((len(CHs)))
     RecordPerFile={'records':{},'errors':[]}
-    PrvLines=''
+    PrcLines='';CurSentEls=[]
     for SentCntr,SentLines in enumerate(mecabtools.generate_sentchunks(FP)):
         Errors=[]
         RelvIndPairs=find_relv_ch(CHs,CHProns,CHKeys,SentLines)
@@ -122,14 +117,20 @@ def annotate_homonyms(FP,CHs,CHProns,CHKeys,CHFreqsTotal):
                 RelvIndPairs=zip(RelvSentInds,RelvCHInds)
             if not RelvSentInds:
                 continue
-            PrvSent=''.join([PrvLine.split('\t')[0] for PrvLine in PrvLines])
-            if len(PrvSent)>90:
-                PrvSent=PrvSent[-90:]
-            RenderedSent='\n[直前の内容]...('+PrvSent+')\n'+''.join([colour_string_cycle('##'+Wd.pronunciation+'##',RelvSentInds.index(Ind)+1) if Ind in RelvSentInds else Wd.orth for (Ind,Wd) in enumerate(Sent.wds)])
+            else:
+                RelvSentEls=[Wd.pronunciation for (Ind,Wd) in enumerate(Sent.wds) if Ind in RelvSentInds ]
+                if all(RelvSentEl in PrvSentEls for RelvSentEl in RelvSentEls):
+                    continue
+            CurSentEls=[Wd.pronunciation if Ind in RelvSentInds else Wd.orth for (Ind,Wd) in enumerate(Sent.wds)]
+            PrcSent=''.join([PrvLine.split('\t')[0] for PrvLine in PrcLines])
+            if len(PrcSent)>90:
+                PrcSent=PrcSent[-90:]
+            RenderedCurSent=''.join(colour_hash_list(CurSentEls,RelvSentInds))
+            RenderedSent='\n[直前の内容]...('+PrcSent+')\n'+RenderedCurSent
             print(RenderedSent)
             Inputs=[]
             for (Num,(RelvSentInd,RelvCHInd)) in enumerate(RelvIndPairs):
-                ValidatedInput=get_validate_input(Num+1,Sent.wds[RelvSentInd],CHs[RelvCHInd])
+                ValidatedInput=get_validate_input(Num,Sent.wds[RelvSentInd],CHs[RelvCHInd])
                 if ValidatedInput is False:
                     Errors.append([SentID,Num])
                 Inputs.append(ValidatedInput)
@@ -137,19 +138,29 @@ def annotate_homonyms(FP,CHs,CHProns,CHKeys,CHFreqsTotal):
             RecordPerFile['errors'].extend(Errors)
             
             clear()
-        PrvLines=SentLines
+        PrcLines=SentLines
+        PrvSentEls=CurSentEls
     print(FP+' done')
     return RecordPerFile,CHFreqsPerFile
 
-def colour_string_cycle(Str,Cycle):
-    Mod=Cycle%3
+
+
+def colour_hash_list(OrgLofStrs,RelvInds):
+    LofStrs=copy.copy(OrgLofStrs)
+    for Cntr,Ind in enumerate(RelvInds):
+        LofStrs[Ind]=colour_string_cycle(LofStrs[Ind],Cntr,Prefix='##',Suffix='##')
+    return LofStrs
+
+
+def colour_string_cycle(Str,Cntr,Cycle=3,Prefix='',Suffix=''):
+    Mod=Cntr%Cycle
     if Mod==0:
         Colour='blue'
     elif Mod==1:
         Colour='green'
     else:
         Colour='red'
-    return colored(Str,Colour,attrs=['bold'])
+    return colored(Prefix+Str+Suffix,Colour,attrs=['bold'])
 
 def clear(): 
   
@@ -199,6 +210,10 @@ def get_validate_input(Num,Wd,CH):
     while not InputValidP:
         print(colour_string_cycle(Wd.pronunciation,Num))
         OrthCands=list({Wd.orth for Wd in CH.all_words})
+        if all(not myModule.all_of_chartypes_p(Cand,['hiragana']) for Cand in OrthCands):
+            OrthCands.append(CH.hiragana_rendering)
+        if len(OrthCands)==2 and (myModule.all_of_chartypes_p(OrthCands[0],['hiragana']) and myModule.all_of_chartypes_p(OrthCands[1],['han']) or myModule.all_of_chartypes_p(OrthCands[0],['han']) and myModule.all_of_chartypes_p(OrthCands[1],['hiragana'])):
+            OrthCands.append(myModule.render_katakana(CH.hiragana_rendering))
         print(' '.join(OrthCands))
         CandCnt=len(OrthCands)
         InputStr=input('ランク(形式 '+abc(CandCnt,StartChar='m')+',判定不能の場合x): ')
@@ -244,5 +259,13 @@ def register_or_retrieve_namedrecord(Name,ResultDir):
     return PersRecord
 
 if __name__=='__main__':
+    if os.path.isdir(DefRepoDir):
+        RepoDir=DefRepoDir
+    else:
+        Path=input('You do not have the repo in the normal place. Enter the path to the repo: ')
+        if not os.path.isdir(Path):
+            sys.exit('The path you entered do not exist')
+        else:
+            RepoDir=Path
     main()
 
