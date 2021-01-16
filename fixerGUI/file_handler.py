@@ -1,14 +1,15 @@
 from shutil import copyfile
-import os
-import re
-import dictionary_handler as dh
+import os,re,imp
+#import dictionary_handler as dh
 import asyncio as a
+
+#imp.reload(dh)
 
 ##################
 # strip the dictionaries?
 ##################
 strip_flag = False
-strip_flag = True
+#strip_flag = True
 
 
 class Record:
@@ -20,29 +21,29 @@ class Record:
     Two Record() objects are equal if all parts but the speaker tags are equal.
     The method self.getFullRecord() returns a string that contains the speaker tag (if there there is one) 
     '''
-    def __init__( self, record ):
-        tags = ("s", "i", "s2", "i2", ".")
-        #count the number of commas; it must be 8 (subtract one from the count if there is a speaker tag)
-        comma_count = record.count( "," )
-        if any(tag+"," in record for tag in tags): #if there is any tag in temp, then return True; check for tag + "," to avoid a false positive in cases where such as "sneak,英語,..."
-            comma_count -= 1
-        if comma_count != 8 and comma_count != 6:
-            print( "Wrong number of commas: {}.".format( comma_count ) )
-            print( "Line:", record ) 
-        temp = record.replace("\t", ",")
-        temp = temp.split( "," )
+    def __init__( self, line ):
+#        tags = ("s", "i", "s2", "i2", ".")
+#        #count the number of commas; it must be 8 (subtract one from the count if there is a speaker tag)
+#        comma_count = record.count( "," )
+#        if any(tag+"," in record for tag in tags): #if there is any tag in temp, then return True; check for tag + "," to avoid a false positive in cases where such as "sneak,英語,..."
+#            comma_count -= 1
+#        if comma_count != 8 and comma_count != 6:
+#            print( "Wrong number of commas: {}.".format( comma_count ) )
+#            print( "Line:", record ) 
+#        temp = record.replace("\t", ",")
+#        temp = temp.split( "," )
         try:
-            if temp[1] in tags:
-                self.speaker = temp.pop(1) #the pop method removes and returns element 1 from the record list
-            else:
-               self.speaker = False
-            self.record = temp
+#            if temp[1] in tags:
+#                self.speaker = temp.pop(1) #the pop method removes and returns element 1 from the record list
+#            else:
+#               self.speaker = False
+            self.record = line
         except:
             print( "Index Error with record: ", record )
 
-    def __repr__( self ):
-        temp = ",".join( self.record )
-        return temp.replace( ",", "\t", 1 )
+#    def __repr__( self ):
+ #       temp = ",".join( self.record )
+  #      return temp.replace( ",", "\t", 1 )
 
     def __eq__( self, other ):
         if self.record == other.record: return True
@@ -83,7 +84,7 @@ class SpeakerFile:
         getCandidates: returns a list of tuples containing enumerated records of possible candidates for the fix; [ ( "0", "record") , ... ]
     '''
     #class variables shared by all instances of this class
-    corpus_dic = dh.CorpusDictionaries( strip_dictionaries = strip_flag )
+    #corpus_dic = dh.CorpusDictionaries( strip_dictionaries = strip_flag )
     
     def __init__( self, file ):
         self.file = file
@@ -127,14 +128,19 @@ class SpeakerFile:
         temp_record = Record( file_line )
         return temp_record
 
-    def getProblemRecord( self ):
+    def getProblemRecord( self, bool_fnc ):
         in_fh = open( self.file, "r", encoding = "utf-8" )
         self.line = 0
         try:
             while True:
                 temp_record = self.getFileLine( in_fh ) #getFileLine returns a Record() object
                 self.line += 1
-                if re.search("^\d+\t", str(temp_record) ):
+                if not bool_fnc(temp_record.record):
+                    self.addToContext( temp_record.record[0] )
+                    next
+
+                   
+                    '''                if re.search("^\d+\t", str(temp_record) ):
                     #if one or more digits followed by a tab, then add line to context, and continue to next line
                     self.addToContext( temp_record.record[0] )
                     next
@@ -150,6 +156,7 @@ class SpeakerFile:
                     #if the line is already in the dictionary then add line to context, and continue to next line
                     self.addToContext( temp_record.record[0] )
                     next
+                    '''
                 else:
                     #we found a line that is not in the dictionaries
                     self.problem_record = temp_record

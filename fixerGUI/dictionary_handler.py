@@ -18,7 +18,7 @@ class CorpusDictionaries:
         print("strip_dictionaries", strip_dictionaries)
         self.dic = {}
         if strip_dictionaries:
-            print( "Striping the dictionaries...\n")
+            print( "Stripping the dictionaries...\n")
             files = os.listdir( DIC_DIR )
             for file in files:
                 file_parts = file.split( "." )
@@ -49,10 +49,11 @@ class CorpusDictionaries:
                     print ( "Skipping {}".format(file_parts[0]) )
 
         print( "\n\nReading in the dictionary files...\n" )
-        dic_files = os.listdir( STRIPPED_DIC_DIR )
+        DicDir=STRIPPED_DIC_DIR if strip_dictionaries else DIC_DIR
+        dic_files = os.listdir( DicDir )
         for dic_file in dic_files:
             print( dic_file )
-            dic_fh = open( STRIPPED_DIC_DIR + dic_file, "r", encoding = "utf-8" )
+            dic_fh = open( DicDir + dic_file, "r", encoding = "utf-8" )
             while True:
                 dic_record = dic_fh.readline()
                 if dic_record == "": break
