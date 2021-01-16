@@ -2,14 +2,13 @@ import os,imp,pickle,sys,json,glob
 import numpy as np
 from termcolor import colored
 
-# this needs to be adapted Kevin
-#RepoRt='/Users/yosato/myProjects_maclocal'
-RepoRt='/cygwin64/home/motok'
+HomeDir=os.getenv('HOMEPATH') if os.name=='nt' else os.getenv('HOME')
 
-RepoDir=os.path.join(RepoRt,'kevin_kansai')
+RepoDir=os.path.join(HomeDir,'kevin_kansai')
+assert os.path.isdir(RepoDir),'repo does not exist'
 
-sys.path.append(os.path.join(RepoDir,'myPythonLibs'))
-sys.path.append(os.path.join(RepoDir,'normalise_jp'))
+#sys.path.append(os.path.join(RepoDir,'myPythonLibs'))
+#sys.path.append(os.path.join(RepoDir,'normalise_jp'))
 
 from mecabtools import mecabtools
 import normalise_mecab
