@@ -18,7 +18,7 @@ def main():
     Name=input_name()
     PersRecord=register_or_retrieve_namedrecord(Name,ResultDir)
     clear()
-    NewPersRecord=backend(Name,PersRecord,FPs,CHs)
+    backend(Name,PersRecord,FPs,CHs,ResultDir)
 
 def get_data(RepoDir):
     CorpusDir=os.path.join(RepoDir,'corpus_files')
@@ -32,10 +32,11 @@ def get_data(RepoDir):
 
     return FPs,CHs,ResultDir
 
-def backend(Name,PersRecord,FPs,CHs):
+def backend(Name,PersRecord,FPs,CHs,ResultDir):
     CHFreqsTotal=np.zeros(len(CHs))
     DoneFNs=PersRecord['done_fns']
     FPs=[FP for FP in FPs if os.path.basename(FP) not in DoneFNs]
+    FPs=sorted(FPs,key=lambda FP:os.path.getsize(FP))
     RemainingCnt=len(FPs)
     if RemainingCnt==0:
         print('すでに作業は完了しています')
@@ -59,7 +60,7 @@ def backend(Name,PersRecord,FPs,CHs):
             print('次回以降未完了部分を続けてください。')
             break
 
-    save_record(Name,PersRecord)
+    save_record(Name,PersRecord,ResultDir)
 
     if RemainingCnt==0:
         print('すべてのファイルが完了しました。協力ありがとうございました')
@@ -249,7 +250,7 @@ def input_name():
         InputValid=pythonlib_ys.main.prompt_loop_bool('名前は\n'+Name+'\nでよろしいですか。',TO=30,Lang='jp')
     return Name
 
-def save_record(Name,Record):
+def save_record(Name,Record,ResultDir):
     UserJson=os.path.join(ResultDir,'personalrecord_'+Name+'.json')
     open(UserJson,'wt').write(json.dumps(Record,ensure_ascii=False))
     print('ここまでの作業内容は保存されました。')
