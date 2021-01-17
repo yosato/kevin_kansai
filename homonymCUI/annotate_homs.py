@@ -1,8 +1,6 @@
 import os,imp,pickle,sys,json,glob,copy
 import numpy as np
 from termcolor import colored
-from pythonlib_ys import main as myModule
-
 #sys.path.append(os.path.join(RepoDir,'normalise_jp'))
 HomeDir=os.getenv('HOMEPATH') if os.name=='nt' else os.getenv('HOME')
 DefRepoDir=os.path.join(HomeDir,'kevin_kansai')
@@ -13,6 +11,7 @@ import normalise_mecab
 import pythonlib_ys
 imp.reload(mecabtools)
 imp.reload(pythonlib_ys)
+imp.reload(normalise_mecab)
 
 def main():    
     FPs,CHs,ResultDir=get_data(RepoDir)
@@ -130,9 +129,11 @@ def annotate_homonyms(FP,CHs,CHProns,CHKeys,CHFreqsTotal):
             print(RenderedSent)
             Inputs=[]
             for (Num,(RelvSentInd,RelvCHInd)) in enumerate(RelvIndPairs):
-                ValidatedInput=get_validate_input(Num,Sent.wds[RelvSentInd],CHs[RelvCHInd])
+                ValidatedInput,NewCH=get_validate_input(Num,Sent.wds[RelvSentInd],CHs[RelvCHInd])
                 if ValidatedInput is False:
                     Errors.append([SentID,Num])
+                elif NewCH is not None:
+                    CHs[RelvCHInd]=NewCH
                 Inputs.append(ValidatedInput)
             RecordPerFile['records'][SentID]=Inputs
             RecordPerFile['errors'].extend(Errors)
@@ -206,25 +207,38 @@ def abc(num,StartChar='a',Delim=' '):
     return Delim.join(RetStr)
 
 def get_validate_input(Num,Wd,CH):
-    InputValidP=False
+    InputValidP=False;NewCH=None
     while not InputValidP:
         print(colour_string_cycle(Wd.pronunciation,Num))
         OrthCands=list({Wd.orth for Wd in CH.all_words})
-        if all(not myModule.all_of_chartypes_p(Cand,['hiragana']) for Cand in OrthCands):
+        if all(not pythonlib_ys.main.all_of_chartypes_p(Cand,['hiragana']) for Cand in OrthCands):
             OrthCands.append(CH.hiragana_rendering)
-        if len(OrthCands)==2 and (myModule.all_of_chartypes_p(OrthCands[0],['hiragana']) and myModule.all_of_chartypes_p(OrthCands[1],['han']) or myModule.all_of_chartypes_p(OrthCands[0],['han']) and myModule.all_of_chartypes_p(OrthCands[1],['hiragana'])):
-            OrthCands.append(myModule.render_katakana(CH.hiragana_rendering))
+        if len(OrthCands)==2 and (pythonlib_ys.main.all_of_chartypes_p(OrthCands[0],['hiragana']) and pythonlib_ys.main.all_of_chartypes_p(OrthCands[1],['han']) or pythonlib_ys.main.all_of_chartypes_p(OrthCands[0],['han']) and pythonlib_ys.main.all_of_chartypes_p(OrthCands[1],['hiragana'])):
+            OrthCands.append(pythonlib_ys.main.render_katakana(CH.hiragana_rendering))
         print(' '.join(OrthCands))
-        CandCnt=len(OrthCands)
-        InputStr=input('ランク(形式 '+abc(CandCnt,StartChar='m')+',判定不能の場合x): ')
-        ValidatedInput=validate_input(InputStr,CandCnt)
-        if ValidatedInput:
-            return dict(zip(OrthCands,ValidatedInput))
-        elif ValidatedInput is False:
-            return False
+        InputStr=input('ランク(形式 '+abc(len(OrthCands),StartChar='m')+',自分で書き方を加える場合はn,データが間違っている場合はx): ')
+            
+        if InputStr=='n':
+            InputOK=False
+            while not InputOK:
+                NewInput=input('加えたい書き方: ')
+                if pythonlib_ys.main.prompt_loop_bool(NewInput.strip()+' でよろしいですか',Lang='jp'):
+                    InputOK=True
+                    OrthCands.append(NewInput)
+                    print(' '.join(OrthCands))
+                    InputStr=input('ランク(形式 '+abc(len(OrthCands),StartChar='m')+'): ')
 
-    
-    
+                    ValidatedInput=validate_input(InputStr,len(OrthCands))
+                    NewWd=CH.all_words[0]
+                    NewCH=copy.deepcopy(CH)
+                    NewWd.change_feats({'orth':NewInput})
+                    NewCH.add_word(NewWd)
+        else:
+            ValidatedInput=validate_input(InputStr,len(OrthCands))
+        if ValidatedInput:
+            return dict(zip(OrthCands,ValidatedInput)),NewCH
+        elif ValidatedInput is False:
+            return None,None
 
 def input_name():
     InputValid=False
@@ -259,6 +273,8 @@ def register_or_retrieve_namedrecord(Name,ResultDir):
     return PersRecord
 
 if __name__=='__main__':
+    if len(sys.argv)==2:
+        DefRepoDir=sys.argv[1]
     if os.path.isdir(DefRepoDir):
         RepoDir=DefRepoDir
     else:
