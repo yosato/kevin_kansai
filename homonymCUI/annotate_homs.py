@@ -13,6 +13,9 @@ imp.reload(mecabtools)
 imp.reload(pythonlib_ys)
 imp.reload(normalise_mecab)
 
+global NumDict
+NumDict=    dict(zip(list('１２３４５６７８９０'),list('1234567890')))
+
 def main():    
     FPs,CHs,ResultDir=get_data(RepoDir)
     Name=input_name()
@@ -54,13 +57,13 @@ def backend(Name,PersRecord,FPs,CHs,ResultDir):
         PersRecord['done_fns'].append(FN)
         PersRecord[FN]=RecordPerFile
         CHFreqsTotal=CHFreqsTotal+CHFreqsPerFile
+        print('ファイル一つ分の入力が完了しました。')
+        save_record(Name,PersRecord,ResultDir)        
         
-        if RemainingCnt and not pythonlib_ys.main.prompt_loop_bool('ファイル一つ分の入力が完了しました。次を続けますか?',TO=20,Default=True):
+        if RemainingCnt and not pythonlib_ys.main.prompt_loop_bool('次を続けますか?',TO=20,Default=True):
 
             print('次回以降未完了部分を続けてください。')
             break
-
-    save_record(Name,PersRecord,ResultDir)
 
     if RemainingCnt==0:
         print('すべてのファイルが完了しました。協力ありがとうございました')
@@ -77,7 +80,10 @@ def annotate_homonyms(FP,CHs,CHProns,CHKeys,CHFreqsTotal):
         RelvIndPairs=[]
         for SentInd,SentLine in enumerate(SentLines):
             Bool=False
-            Orth,Rest=SentLine.split('\t')
+            OrthRest=SentLine.split('\t')
+            if len(OrthRest)!=2:
+                continue
+            Orth,Rest=OrthRest
             Fts=Rest.split(',')
             LineEls=[Orth]+Fts
             if not any(PotPron in LineEls for PotPron in PotProns):
@@ -145,8 +151,6 @@ def annotate_homonyms(FP,CHs,CHProns,CHKeys,CHFreqsTotal):
     print(FP+' done')
     return RecordPerFile,CHFreqsPerFile
 
-
-
 def colour_hash_list(OrgLofStrs,RelvInds):
     LofStrs=copy.copy(OrgLofStrs)
     for Cntr,Ind in enumerate(RelvInds):
@@ -176,9 +180,15 @@ def clear():
   
 
 def validate_input(OrgStr,Num,Delim=' '):
-    if OrgStr.strip().lower()=='x':
+    if OrgStr.strip().lower() in ('x','X','Ｘ','ｘ'):
         return False
-    Str=''.join([pythonlib_ys.main.zenkaku_hankaku(Char) if ord(Char)>300 else Char for Char in OrgStr ])
+    Str=OrgStr.replace('　',' ')
+    ZenkakuNumsInStr=[Char for Char in Str if Char in ('１','２','３','４','５','６','７','８','９','０')]
+    if ZenkakuNumsInStr:
+        for ZenNum in ZenkakuNumsInStr:
+            Str=Str.replace(ZenNum,NumDict[ZenNum])
+#    Str=''.join([pythonlib_ys.main.zenkaku_hankaku(Char) if ord(Char)>300 else Char for Char in OrgStr ])
+ 
     if ' ' not in Str:
         print('各ランクをスペースで区切ってください')
         return None
