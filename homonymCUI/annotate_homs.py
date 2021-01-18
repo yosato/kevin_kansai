@@ -30,6 +30,8 @@ def get_data(RepoDir):
     ResultDir=RepoDir+'/homonymCUI/results'
     if not os.path.isfile(CHFP) or not os.path.isdir(ResultDir) or not FPs:
         sys.exit('probably you use the wrong dir for repository')
+    FileCnt=len(FPs)
+    FPs=sorted(FPs,key=lambda FP:os.path.getsize(FP))[:FileCnt//2]
     with open(CHFP,'br') as FSr:
         CHs= pickle.load(FSr)
 
@@ -39,7 +41,6 @@ def backend(Name,PersRecord,FPs,CHs,ResultDir):
     CHFreqsTotal=np.zeros(len(CHs))
     DoneFNs=PersRecord['done_fns']
     FPs=[FP for FP in FPs if os.path.basename(FP) not in DoneFNs]
-    FPs=sorted(FPs,key=lambda FP:os.path.getsize(FP))
     RemainingCnt=len(FPs)
     if RemainingCnt==0:
         print('すでに作業は完了しています')
