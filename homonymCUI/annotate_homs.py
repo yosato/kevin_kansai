@@ -99,7 +99,7 @@ def annotate_homonyms(FP,CHs,CHProns,CHKeys,CHFreqsTotal):
 
     CHFreqsPerFile=np.zeros((len(CHs)))
     RecordPerFile={'records':{},'errors':[]}
-    PrcLines='';CurSentEls=[]
+    PrcLines='';CurSentEls=[];PrvSentEls=[]
     for SentCntr,SentLines in enumerate(mecabtools.generate_sentchunks(FP)):
         Errors=[]
         RelvIndPairs=find_relv_ch(CHs,CHProns,CHKeys,SentLines)
