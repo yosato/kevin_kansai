@@ -1,0 +1,7 @@
+bidict==0.21.2
+numpy==1.20.0
+romkan==0.2.1
+six==1.12.0
+termcolor==1.1.0
+-e git://github.com/yosato/myPythonLibs.git#egg=myPythonLibs
+#pythonlib-ys==1.0.0
